@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Scroll & Sword</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app" class="app">
+    <header class="topbar">
+      <h1>⚔️ Scroll & Sword</h1>
+      <div class="stats">
+        <span>HP: <b id="hp">10</b></span>
+        <span>Act: <b id="act">1</b>/3</span>
+        <span>Gold: <b id="gold">0</b></span>
+      </div>
+    </header>
+
+    <section id="menu" class="screen active">
+      <h2>Menu</h2>
+      <button data-action="new">New Game</button>
+      <button data-action="resume">Resume</button>
+
+      <div class="settings">
+        <label class="row-inline">
+          <input id="aiToggle" type="checkbox" />
+          <span>Use AI endpoint</span>
+        </label>
+        <input id="apiUrlInput" type="text" placeholder="https://your-worker.workers.dev" />
+        <input id="seedInput" type="number" placeholder="Optional seed (e.g. 12345)" />
+        <button id="saveSettingsBtn">Save Settings</button>
+      </div>
+
+      <div class="save-tools">
+        <button id="copySaveBtn" class="secondary">Copy Save Code</button>
+        <input id="importSaveInput" type="text" placeholder="Paste save code" />
+        <button id="importSaveBtn" class="secondary">Import Save Code</button>
+      </div>
+
+      <p class="small">Scroll to move • Press to select</p>
+    </section>
+
+    <section id="theme" class="screen">
+      <h2>Choose Lore Theme</h2>
+      <button data-theme="medieval">Medieval</button>
+      <button data-theme="noir">Modern / Retro Noir</button>
+      <button data-theme="scifi">Sci‑Fi</button>
+    </section>
+
+    <section id="scene" class="screen">
+      <div id="sceneMeta" class="scene-meta"></div>
+      <div id="inventory" class="inventory"></div>
+      <article id="narration" class="narration"></article>
+      <div id="choices" class="choices"></div>
+      <button id="wheelBtn" class="fate">🎡 Wheel of Fate</button>
+    </section>
+
+    <section id="wheel" class="screen">
+      <h2>Wheel of Fate</h2>
+      <canvas id="wheelCanvas" width="260" height="260"></canvas>
+      <p id="wheelHint" class="small">Scroll to spin, press Fate to release</p>
+      <button id="releaseBtn">Release Fate</button>
+    </section>
+
+    <section id="end" class="screen">
+      <h2 id="endTitle">The End</h2>
+      <p id="endText"></p>
+      <button id="restartBtn">Back to Menu</button>
+    </section>
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

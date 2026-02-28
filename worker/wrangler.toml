@@ -1,0 +1,6 @@
+name = "scroll-and-sword-api"
+main = "index.js"
+compatibility_date = "2026-02-28"
+
+[vars]
+MODEL = "openai/gpt-4o-mini"
