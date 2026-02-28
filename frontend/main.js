@@ -17,43 +17,12 @@ const state = {
 let API_URL = localStorage.getItem("sas_api_url") || "";
 let forcedSeed = localStorage.getItem("sas_forced_seed") || "";
 
-const themeTables = {
-  medieval: {
-    tones: ["ash-swept", "ironbound", "oathscarred", "moonlit"],
-    locales: ["ruined abbey", "wolf road", "thornkeep market", "crypt of bells"],
-    foes: ["bandit lord", "grave warden", "witch knight", "hollow beast"],
-    hooks: ["a relic hums in your satchel", "a broken banner marks your path", "a debt is called in blood"],
-    bosses: ["Duke of Cinders", "Bell-Knight of the Crypt", "Thornkeep Usurper"],
-  },
-  noir: {
-    tones: ["rain-soaked", "smoky", "neon-bitten", "whisper-thin"],
-    locales: ["back-alley diner", "flickering arcade", "old metro platform", "rooftop jazz bar"],
-    foes: ["fixer", "crooked inspector", "phantom courier", "wiretap ghost"],
-    hooks: ["an envelope arrives unsigned", "your alibi just vanished", "the city remembers your name"],
-    bosses: ["The Night Commissioner", "Neon Syndicate King", "Phantom Judge"],
-  },
-  scifi: {
-    tones: ["ion-lit", "void-cold", "chrome-silent", "signal-fractured"],
-    locales: ["orbital salvage ring", "bio-dome corridor", "quantum relay hub", "derelict war frigate"],
-    foes: ["rogue synth", "pirate captain", "memory leech", "drone swarm"],
-    hooks: ["your suit flags unknown life", "a distress ping mirrors your voice", "reactor time is collapsing"],
-    bosses: ["Admiral Null", "The Coremind", "Abyssal Dreadnaught"],
-  },
-};
-
-const lootPool = ["Iron Charm", "Medkit", "Lucky Coin", "Nano Patch", "Smoke Capsule", "Rune Shard"];
-
 function show(screen) {
   screens.forEach((s) => $(s).classList.remove("active"));
   $(screen).classList.add("active");
-  $("hp").textContent = state.hp;
-  $("act").textContent = state.act;
-  $("gold").textContent = state.gold;
-}
-
-function applyThemeClass() {
-  document.body.classList.remove("theme-medieval", "theme-noir", "theme-scifi");
-  if (state.theme) document.body.classList.add(`theme-${state.theme}`);
+  if ($("hp")) $("hp").textContent = state.hp;
+  if ($("act")) $("act").textContent = state.act;
+  if ($("gold")) $("gold").textContent = state.gold;
 }
 
 function save() { localStorage.setItem("sas_save", JSON.stringify(state)); }
@@ -61,7 +30,6 @@ function load() {
   const raw = localStorage.getItem("sas_save");
   if (!raw) return false;
   Object.assign(state, JSON.parse(raw));
-  applyThemeClass();
   return true;
 }
 
@@ -83,16 +51,12 @@ function newGame(theme) {
     inventory: [],
     bossesDefeated: 0,
   });
-  applyThemeClass();
   nextScene();
 }
 
 async function nextScene(choiceText = null) {
   state.step += 1;
   state.act = Math.min(3, Math.ceil(state.step / 4));
-
-  // Boss chapter scene every 4th step
-  const isBossStep = state.step % 4 === 0;
 
   const prompt = {
     theme: state.theme,
@@ -101,87 +65,75 @@ async function nextScene(choiceText = null) {
     step: state.step,
     previousChoice: choiceText,
     history: state.history.slice(-6),
-    isBossStep,
+    isBossStep: state.step % 4 === 0,
   };
 
-  let scene;
-  try {
-    scene = API_URL ? await fetchScene(prompt) : localScene(prompt);
-  } catch {
-    scene = localScene(prompt);
+  let scene = null;
+
+  // AI-first
+  if (API_URL) {
+    try {
+      const r = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prompt),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        if (isValidScene(j)) scene = j;
+      }
+    } catch {}
   }
 
+  // fallback
+  if (!scene) scene = localScene(prompt);
+
   state.scene = scene;
-  state.history.push({ narration: scene.narration, choices: scene.choices, risk: scene.risk, tag: scene.tag, picked: null });
+  state.history.push({ scene: scene.narration, choices: scene.choices, picked: null });
   renderScene();
   save();
   show("scene");
 }
 
-async function fetchScene(prompt) {
-  const r = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(prompt),
-  });
-  if (!r.ok) throw new Error("AI failed");
-  return r.json();
+function isValidScene(obj) {
+  return obj && typeof obj.narration === "string" && Array.isArray(obj.choices) && obj.choices.length === 4;
 }
 
 function localScene({ theme, hp, act, step, isBossStep }) {
-  const t = themeTables[theme];
+  const pools = {
+    medieval: ["A torchlit corridor groans beneath your boots.", "A hooded ranger blocks the ruined gate.", "The village bell rings thrice at midnight."],
+    noir: ["Rain crawls down neon windows as a saxophone fades.", "A black sedan idles outside the diner.", "A letter arrives with no return address."],
+    scifi: ["Warning glyphs pulse in the airlock.", "A drone swarm shadows your route.", "The reactor core hums like thunder."],
+  };
 
   if (isBossStep) {
-    const boss = t.bosses[Math.min(act - 1, t.bosses.length - 1)];
     return {
-      narration: `⚠️ BOSS CHAPTER: ${boss} stands before you. This is a decisive confrontation for Act ${act}.`,
-      choices: [
-        "All-in assault",
-        "Exploit weakness",
-        "Defensive strategy",
-        "Risky deception",
-      ],
+      narration: `⚠️ Boss chapter of Act ${act}. Your next move decides everything.`,
+      choices: ["All-in assault", "Exploit weakness", "Defensive posture", "Risky deception"],
       risk: "high",
       tag: "boss",
     };
   }
 
-  const tone = t.tones[Math.floor(seeded(1) * t.tones.length)];
-  const locale = t.locales[Math.floor(seeded(2) * t.locales.length)];
-  const foe = t.foes[Math.floor(seeded(3) * t.foes.length)];
-  const hook = t.hooks[Math.floor(seeded(4) * t.hooks.length)];
-
-  const tags = ["combat", "exploration", "social", "hazard"];
-  const tag = tags[Math.floor(seeded(5) * tags.length)];
-
-  const riskRoll = seeded(6) + act * 0.12 + (hp <= 4 ? 0.2 : 0);
-  const risk = riskRoll < 0.45 ? "low" : riskRoll < 0.95 ? "mid" : "high";
-
-  const narration = `The ${tone} air of the ${locale} closes in. You spot signs of a ${foe}; ${hook}.`;
-
-  const choiceSets = {
-    combat: ["Draw steel and strike first", "Set a trap and lure them in", "Feign weakness, then counter", "Break line of sight and reposition"],
-    exploration: ["Search for hidden paths", "Track recent footprints", "Inspect the strange markings", "Climb for higher vantage"],
-    social: ["Offer a risky bargain", "Bluff with forged confidence", "Appeal to old honour", "Listen before acting"],
-    hazard: ["Push through quickly", "Stabilise the environment first", "Use gear to bypass danger", "Retreat and wait for a window"],
+  const narr = pools[theme][(step + act) % pools[theme].length] + ` You feel ${hp <= 4 ? "wounded" : "ready"}.`;
+  return {
+    narration: narr,
+    choices: ["Investigate carefully", "Confront directly", "Retreat and regroup", "Use an improvised trick"],
+    risk: "mid",
+    tag: "exploration",
   };
-
-  return { narration, choices: choiceSets[tag], risk, tag };
 }
 
 function renderScene() {
-  $("narration").textContent = state.scene.narration;
-  const risk = state.scene.risk || "mid";
-  const tag = state.scene.tag || "exploration";
-  $("sceneMeta").innerHTML = `
-    <span class="badge">${state.theme.toUpperCase()}</span>
-    <span class="badge">${tag.toUpperCase()}</span>
-    <span class="badge risk-${risk}">RISK: ${risk.toUpperCase()}</span>
-  `;
-
-  $("inventory").innerHTML = state.inventory.length
-    ? state.inventory.map((i) => `<span class="inv-item">${i}</span>`).join("")
-    : `<span class="inv-item">No items</span>`;
+  if ($("narration")) $("narration").textContent = state.scene.narration;
+  if ($("sceneMeta")) {
+    const risk = (state.scene.risk || "mid").toUpperCase();
+    const tag = (state.scene.tag || "exploration").toUpperCase();
+    $("sceneMeta").innerHTML = `<span class="badge">${state.theme.toUpperCase()}</span><span class="badge">${tag}</span><span class="badge">RISK ${risk}</span>`;
+  }
+  if ($("inventory")) {
+    $("inventory").innerHTML = state.inventory.length ? state.inventory.map(i => `<span class="inv-item">${i}</span>`).join("") : `<span class="inv-item">No items</span>`;
+  }
 
   const box = $("choices");
   box.innerHTML = "";
@@ -193,68 +145,39 @@ function renderScene() {
   });
 }
 
-function rollLoot() {
-  if (seeded(30) > 0.62 && state.inventory.length < 6) {
-    const item = lootPool[Math.floor(seeded(31) * lootPool.length)];
-    state.inventory.push(item);
-  }
-  state.gold += Math.floor(seeded(32) * 7) + 1;
-}
-
 function pickChoice(i) {
   const choice = state.scene.choices[i];
   state.history[state.history.length - 1].picked = choice;
 
-  const isBoss = state.scene.tag === "boss";
+  const risk = ((state.step + i + (state.seed % 7)) % 10) + (state.scene.risk === "high" ? 2 : 0);
+  if (risk > 8) state.hp -= 3;
+  else if (risk > 5) state.hp -= 1;
+  else if (risk < 2 && state.hp < 10) state.hp += 1;
 
-  const base = seeded(20 + i) + state.act * 0.1;
-  const riskMod = state.scene.risk === "high" ? 0.25 : state.scene.risk === "low" ? -0.15 : 0;
-  let roll = base + riskMod;
-
-  // inventory buffs
-  if (state.inventory.includes("Lucky Coin")) roll -= 0.08;
-  if (state.inventory.includes("Medkit") && state.hp <= 4) {
-    state.hp += 2;
-    state.inventory = state.inventory.filter((x) => x !== "Medkit");
+  state.gold += 1 + Math.floor(seeded(9) * 4);
+  if (seeded(10) > 0.7 && state.inventory.length < 6) {
+    const loot = ["Lucky Coin", "Medkit", "Rune Shard", "Smoke Capsule"][Math.floor(seeded(11) * 4)];
+    state.inventory.push(loot);
   }
 
-  if (isBoss) {
-    roll += 0.15;
-    if (roll > 1.0) state.hp -= 4;
-    else if (roll > 0.7) state.hp -= 2;
-    else {
-      state.bossesDefeated += 1;
-      state.gold += 20;
-    }
-  } else {
-    if (roll > 1.05) state.hp -= 3;
-    else if (roll > 0.78) state.hp -= 1;
-    else if (roll < 0.12 && state.hp < 10) state.hp += 1;
-    rollLoot();
-  }
-
-  if (navigator.vibrate) navigator.vibrate(state.hp <= 0 ? [120, 60, 120] : [40]);
-
-  if (state.hp <= 0) return endGame(false, `You chose: ${choice}. Fate demanded payment.`);
-  if (state.step >= 12) {
-    const bonus = state.bossesDefeated >= 3 ? "Legendary ending unlocked." : "You survived by grit alone.";
-    return endGame(true, `You endured all three acts in the ${state.theme} realm. ${bonus}`);
-  }
+  if (state.hp <= 0) return endGame(false, `You chose: ${choice}. Fate was cruel.`);
+  if (state.step >= 12) return endGame(true, `You survived the ${state.theme} saga.`);
   nextScene(choice);
 }
 
 function endGame(win, text) {
   $("endTitle").textContent = win ? "🏆 You Survived" : "☠️ You Died";
-  $("endText").textContent = `${text}  Gold: ${state.gold} • Bosses: ${state.bossesDefeated}/3`;
+  $("endText").textContent = `${text} Gold: ${state.gold}.`;
   localStorage.removeItem("sas_save");
   show("end");
 }
 
-// Wheel of Fate
+// Wheel
 const wheel = { angle: 0, velocity: 0, spinning: false };
-const ctx = $("wheelCanvas").getContext("2d");
+const ctx = $("wheelCanvas")?.getContext("2d");
 
 function drawWheel() {
+  if (!ctx) return;
   const choices = state.scene?.choices || [];
   const n = Math.max(choices.length, 1);
   const r = 120;
@@ -289,39 +212,39 @@ function animateWheel() {
   requestAnimationFrame(animateWheel);
 }
 
-$("wheelBtn").onclick = () => { drawWheel(); show("wheel"); };
-$("releaseBtn").onclick = () => {
+$("wheelBtn")?.addEventListener("click", () => { drawWheel(); show("wheel"); });
+$("releaseBtn")?.addEventListener("click", () => {
   if (wheel.spinning) return;
   wheel.spinning = true;
   if (wheel.velocity < 0.03) wheel.velocity = 0.12;
   animateWheel();
-};
+});
 window.addEventListener("wheel", (e) => {
-  if (!$("wheel").classList.contains("active")) return;
+  if (!$("wheel")?.classList.contains("active")) return;
   wheel.velocity += Math.max(-0.02, Math.min(0.02, -e.deltaY / 1200));
   drawWheel();
 });
 
-// Menu/theme bindings
+// Menu bindings
 
-document.querySelector('[data-action="new"]').onclick = () => show("theme");
-document.querySelector('[data-action="resume"]').onclick = () => (load() ? (renderScene(), show("scene")) : show("theme"));
+document.querySelector('[data-action="new"]')?.addEventListener("click", () => show("theme"));
+document.querySelector('[data-action="resume"]')?.addEventListener("click", () => load() ? (renderScene(), show("scene")) : show("theme"));
 
-document.querySelectorAll('[data-theme]').forEach((b) => (b.onclick = () => newGame(b.dataset.theme)));
+document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener("click", () => newGame(b.dataset.theme)));
 
-$("restartBtn").onclick = () => show("menu");
+$("restartBtn")?.addEventListener("click", () => show("menu"));
 
-// Settings + save tools
 function initMenuSettings() {
   const aiToggle = $("aiToggle");
   const apiUrlInput = $("apiUrlInput");
   const seedInput = $("seedInput");
+  if (!aiToggle || !apiUrlInput || !seedInput) return;
 
   aiToggle.checked = Boolean(API_URL);
   apiUrlInput.value = API_URL;
   seedInput.value = forcedSeed;
 
-  $("saveSettingsBtn").onclick = () => {
+  $("saveSettingsBtn")?.addEventListener("click", () => {
     API_URL = aiToggle.checked ? apiUrlInput.value.trim() : "";
     forcedSeed = seedInput.value.trim();
 
@@ -332,9 +255,9 @@ function initMenuSettings() {
     else localStorage.removeItem("sas_forced_seed");
 
     alert("Settings saved");
-  };
+  });
 
-  $("copySaveBtn").onclick = async () => {
+  $("copySaveBtn")?.addEventListener("click", async () => {
     const raw = localStorage.getItem("sas_save");
     if (!raw) return alert("No save yet");
     const code = btoa(unescape(encodeURIComponent(raw)));
@@ -344,20 +267,20 @@ function initMenuSettings() {
     } catch {
       alert(code);
     }
-  };
+  });
 
-  $("importSaveBtn").onclick = () => {
-    const input = $("importSaveInput").value.trim();
+  $("importSaveBtn")?.addEventListener("click", () => {
+    const input = $("importSaveInput")?.value.trim();
     if (!input) return alert("Paste save code first");
     try {
       const json = decodeURIComponent(escape(atob(input)));
-      JSON.parse(json); // validate
+      JSON.parse(json);
       localStorage.setItem("sas_save", json);
       alert("Save imported. Tap Resume.");
     } catch {
       alert("Invalid save code");
     }
-  };
+  });
 }
 
 initMenuSettings();
