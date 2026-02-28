@@ -14,7 +14,7 @@ const state = {
   bossesDefeated: 0,
 };
 
-let API_URL = localStorage.getItem("sas_api_url") || "";
+let API_URL = localStorage.getItem("sas_api_url") || "https://scroll-and-sword-api.swordandscroll.workers.dev";
 let forcedSeed = localStorage.getItem("sas_forced_seed") || "";
 
 function show(screen) {
