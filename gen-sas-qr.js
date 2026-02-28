@@ -6,7 +6,7 @@ const data = {
   iconUrl: 'https://fav.farm/⚔️',
   themeColor: '#6ea8ff'
 };
-QRCode.toFile('C:/Users/Badr/.openclaw/workspace/scroll-and-sword/scroll-and-sword-qr.png', JSON.stringify(data), { width: 400 }, (err) => {
+QRCode.toFile('C:/Users/Badr/Documents/GitHub/scroll-and-sword/scroll-and-sword-qr.png', JSON.stringify(data), { width: 400 }, (err) => {
   if (err) throw err;
   console.log('ok');
 });
