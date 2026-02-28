@@ -235,22 +235,17 @@ document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener("cli
 $("restartBtn")?.addEventListener("click", () => show("menu"));
 
 function initMenuSettings() {
-  const aiToggle = $("aiToggle");
-  const apiUrlInput = $("apiUrlInput");
   const seedInput = $("seedInput");
-  if (!aiToggle || !apiUrlInput || !seedInput) return;
+  if (!seedInput) return;
 
-  aiToggle.checked = Boolean(API_URL);
-  apiUrlInput.value = API_URL;
   seedInput.value = forcedSeed;
 
   $("saveSettingsBtn")?.addEventListener("click", () => {
-    API_URL = aiToggle.checked ? apiUrlInput.value.trim() : "";
+    // Endpoint is locked globally for all users
+    API_URL = "https://scroll-and-sword-api.swordandscroll.workers.dev";
+    localStorage.setItem("sas_api_url", API_URL);
+
     forcedSeed = seedInput.value.trim();
-
-    if (API_URL) localStorage.setItem("sas_api_url", API_URL);
-    else localStorage.removeItem("sas_api_url");
-
     if (forcedSeed) localStorage.setItem("sas_forced_seed", forcedSeed);
     else localStorage.removeItem("sas_forced_seed");
 
