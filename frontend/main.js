@@ -244,6 +244,10 @@ document.querySelector('[data-action="resume"]')?.addEventListener("click", () =
 document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener("click", () => newGame(b.dataset.theme)));
 
 $("restartBtn")?.addEventListener("click", () => show("menu"));
+$("globalMenuBtn")?.addEventListener("click", () => {
+  wheel.spinning = false;
+  show("menu");
+});
 $("backToMenuBtn")?.addEventListener("click", () => show("menu"));
 $("backToMenuFromWheelBtn")?.addEventListener("click", () => {
   wheel.spinning = false;
