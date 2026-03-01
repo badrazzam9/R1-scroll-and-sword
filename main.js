@@ -83,6 +83,11 @@ async function nextScene(choiceText = null) {
     isBossStep: state.step > 0 && state.step % 5 === 0,
   };
 
+  const log = (msg) => {
+    console.log(msg);
+    if ($("debugLog")) $("debugLog").textContent = "Log: " + msg;
+  };
+
   let scene = null;
   let sceneSource = "fallback";
 
@@ -92,38 +97,49 @@ async function nextScene(choiceText = null) {
       show("scene");
       $("narration").innerHTML = '<span class="loading">The Oracle is weaving your fate...</span>';
       $("choices").innerHTML = "";
+
       // Try Native R1 AI First
       if (typeof PluginMessageHandler !== "undefined") {
-        const fullPrompt = `You are a pixel RPG narrator. Context: ${JSON.stringify(prompt)}. RETURN ONLY JSON: {"narration":"...","choices":["...","...","...","..."],"risk":"low|mid|high","tag":"..."}`;
+        log("Trying Native AI...");
+        const simplePrompt = `RPG. Theme: ${state.theme}. Action: ${choiceText}. Step: ${state.step}. RETURN JSON: {"narration":"...","choices":["...","...","...","..."],"risk":"low|mid|high","tag":"..."}`;
 
         const responseData = await new Promise((resolve) => {
           oracleResolver = resolve;
-          // Timeout after 15s if R1 AI hangs
-          setTimeout(() => resolve(null), 15000);
+          const tid = setTimeout(() => {
+            log("Native AI TIMEOUT (12s)");
+            resolve(null);
+          }, 12000);
 
-          PluginMessageHandler.postMessage(JSON.stringify({
-            message: fullPrompt,
-            useLLM: true
-          }));
+          try {
+            PluginMessageHandler.postMessage(JSON.stringify({
+              message: simplePrompt,
+              useLLM: true
+            }));
+          } catch (pe) {
+            log("Bridge Error: " + pe.message);
+            clearTimeout(tid);
+            resolve(null);
+          }
         });
 
         if (responseData) {
           try {
+            log("Native Response Rx");
             const j = JSON.parse(responseData);
             if (isValidScene(j)) {
               scene = j;
               sceneSource = "r1-native";
+              log("Native AI Success");
             }
           } catch (e) {
-            lastErr = "Native AI JSON error: " + e.message;
+            log("Native JSON Error: " + e.message);
           }
-        } else {
-          lastErr = "Native AI Timeout";
         }
       }
 
-      // Fallback to Cloudflare/OpenRouter if Native fails or missing
+      // Fallback to Cloudflare if native fails
       if (!scene) {
+        log("Trying Worker Fallback...");
         const r = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -134,13 +150,16 @@ async function nextScene(choiceText = null) {
           if (isValidScene(j)) {
             scene = j;
             sceneSource = "ai-worker";
+            log("Worker Success");
           }
         } else {
+          log("Worker Failed: HTTP " + r.status);
           const err = await r.json().catch(() => ({}));
           lastErr = err.detail || `HTTP ${r.status}`;
         }
       }
     } catch (e) {
+      log("Global AI Error: " + e.message);
       lastErr = e.message;
     }
   }
