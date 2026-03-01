@@ -1,4 +1,8 @@
-﻿export default {
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// index.js
+var index_default = {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: cors() });
@@ -6,31 +10,25 @@
     if (request.method !== "POST") {
       return json({ ok: true, service: "scroll-and-sword-api" }, 200);
     }
-
     try {
       const body = await request.json();
       const { theme, hp, step, previousChoice, history } = body || {};
-
-      // Defaults for stability
       const finalTheme = theme || "medieval";
       const finalStep = step || 1;
-
       const sys = [
         "You are the narrator for a pixel RPG called Scroll and Sword.",
         "MANDATORY: Return ONLY a raw JSON object. No markdown blocks. No extra text.",
         "Narration: 1-3 gritty, actionable sentences.",
         "Choices: Exactly 4 separate options, 3-8 words each.",
         "Risk: 'low'|'mid'|'high'.",
-        "Tag: 'combat'|'exploration'|'social'|'hazard'|'boss'.",
+        "Tag: 'combat'|'exploration'|'social'|'hazard'|'boss'."
       ].join(" ");
-
       const schemaHint = {
         narration: "string",
         choices: ["string", "string", "string", "string"],
         risk: "low|mid|high",
         tag: "combat|exploration|social|hazard|boss"
       };
-
       const user = {
         game: "Scroll and Sword (20 Steps)",
         theme: finalTheme,
@@ -40,12 +38,9 @@
         history: Array.isArray(history) ? history.slice(-6) : [],
         outputSchema: schemaHint
       };
-
       let parsed = null;
       let lastErr = null;
       let usedModel = null;
-
-      // ATTEMPT 1: Cloudflare Native AI (Absolute Stability)
       if (env.AI) {
         try {
           const aiResp = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
@@ -56,7 +51,6 @@
             max_tokens: 300,
             response_format: { type: "json_object" }
           });
-
           if (isValid(aiResp)) {
             parsed = aiResp;
             usedModel = "@cf/llama-3.1-8b-instruct";
@@ -65,14 +59,11 @@
           lastErr = `Cloudflare AI Error: ${e.message}`;
         }
       }
-
       if (parsed) {
         parsed._model = usedModel;
         parsed._source = "ai";
         return json(parsed, 200);
       }
-
-      // ATTEMPT 2: OpenRouter 10-tier Fallback (Aggregator Stability)
       const models = [
         "google/gemini-2.0-flash:free",
         "meta-llama/llama-3.1-8b-instruct:free",
@@ -80,23 +71,17 @@
         "google/gemma-2-9b-it:free",
         "openrouter/auto-free"
       ];
-
       for (const model of models) {
-        // Double retry for each model in case of transient 429/500
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-
+            const timeoutId = setTimeout(() => controller.abort(), 8e3);
             const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user, controller.signal);
             clearTimeout(timeoutId);
-
             let text = raw?.choices?.[0]?.message?.content || "{}";
             text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) text = jsonMatch[0];
-
             const obj = JSON.parse(text);
             if (isValid(obj)) {
               parsed = obj;
@@ -107,12 +92,11 @@
           } catch (e) {
             const isTimeout = e.name === "AbortError";
             lastErr = `${model} ${isTimeout ? "TIMED OUT" : "FAILED"}: ${e.message || e}`;
-            if (attempt === 1) await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
+            if (attempt === 1) await new Promise((r) => setTimeout(r, 1e3));
           }
         }
         if (parsed) break;
       }
-
       if (!parsed) {
         return json({
           error: "AI_EXHAUSTED",
@@ -124,7 +108,6 @@
           _source: "error"
         }, 503);
       }
-
       parsed._model = usedModel;
       parsed._source = "ai";
       return json(parsed, 200);
@@ -139,7 +122,6 @@
     }
   }
 };
-
 async function callOpenRouter(apiKey, model, systemPrompt, userObj, signal) {
   if (!apiKey) throw new Error("OPENROUTER_API_KEY missing");
   const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -161,14 +143,13 @@ async function callOpenRouter(apiKey, model, systemPrompt, userObj, signal) {
     }),
     signal
   });
-
   if (!resp.ok) {
     const t = await resp.text();
     throw new Error(`openrouter ${resp.status}: ${t.slice(0, 300)}`);
   }
   return resp.json();
 }
-
+__name(callOpenRouter, "callOpenRouter");
 function isValid(obj) {
   if (!obj || typeof obj !== "object") return false;
   if (typeof obj.narration !== "string" || !obj.narration.trim()) return false;
@@ -178,7 +159,7 @@ function isValid(obj) {
   if (!["combat", "exploration", "social", "hazard", "boss"].includes(obj.tag)) return false;
   return true;
 }
-
+__name(isValid, "isValid");
 function cors() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -186,10 +167,15 @@ function cors() {
     "Access-Control-Allow-Headers": "Content-Type"
   };
 }
-
+__name(cors, "cors");
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json", ...cors() }
   });
 }
+__name(json, "json");
+export {
+  index_default as default
+};
+//# sourceMappingURL=index.js.map
