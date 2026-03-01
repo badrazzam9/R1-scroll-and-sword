@@ -89,6 +89,7 @@ async function nextScene(choiceText = null) {
   };
 
   let scene = null;
+  let lastErr = "";
   let sceneSource = "fallback";
 
   // AI-first
