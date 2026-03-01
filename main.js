@@ -85,87 +85,47 @@ async function nextScene(choiceText = null) {
 
   const log = (msg) => {
     console.log(msg);
-    if ($("debugLog")) $("debugLog").textContent = "Log: " + msg;
+    if ($("debugLog")) $("debugLog").textContent = msg;
   };
 
   let scene = null;
   let lastErr = "";
-  let sceneSource = "fallback";
 
-  // AI-first
+  // Go straight to the Cloudflare Worker (which uses built-in AI — no keys needed)
   if (API_URL) {
     try {
       show("scene");
       $("narration").innerHTML = '<span class="loading">The Oracle is weaving your fate...</span>';
       $("choices").innerHTML = "";
 
-      // Try Native R1 AI First
-      if (typeof PluginMessageHandler !== "undefined") {
-        log("Trying Native AI...");
-        const simplePrompt = `RPG. Theme: ${state.theme}. Action: ${choiceText}. Step: ${state.step}. RETURN JSON: {"narration":"...","choices":["...","...","...","..."],"risk":"low|mid|high","tag":"..."}`;
+      log("Calling Oracle...");
+      const r = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prompt),
+      });
 
-        const responseData = await new Promise((resolve) => {
-          oracleResolver = resolve;
-          const tid = setTimeout(() => {
-            log("Native AI TIMEOUT (12s)");
-            resolve(null);
-          }, 12000);
-
-          try {
-            PluginMessageHandler.postMessage(JSON.stringify({
-              message: simplePrompt,
-              useLLM: true
-            }));
-          } catch (pe) {
-            log("Bridge Error: " + pe.message);
-            clearTimeout(tid);
-            resolve(null);
-          }
-        });
-
-        if (responseData) {
-          try {
-            log("Native Response Rx");
-            const j = JSON.parse(responseData);
-            if (isValidScene(j)) {
-              scene = j;
-              sceneSource = "r1-native";
-              log("Native AI Success");
-            }
-          } catch (e) {
-            log("Native JSON Error: " + e.message);
-          }
-        }
-      }
-
-      // Fallback to Cloudflare if native fails
-      if (!scene) {
-        log("Trying Worker Fallback...");
-        const r = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(prompt),
-        });
-        if (r.ok) {
-          const j = await r.json();
-          if (isValidScene(j)) {
-            scene = j;
-            sceneSource = "ai-worker";
-            log("Worker Success");
-          }
+      if (r.ok) {
+        const j = await r.json();
+        if (j && j.narration && Array.isArray(j.choices) && j.choices.length >= 2) {
+          scene = j;
+          // Preserve the worker's _source and _model fields
+          log("Oracle: " + (j._model || "unknown") + " | " + (j._source || "?"));
         } else {
-          log("Worker Failed: HTTP " + r.status);
-          const err = await r.json().catch(() => ({}));
-          lastErr = err.detail || `HTTP ${r.status}`;
+          lastErr = "Invalid response shape";
+          log("Bad response: " + JSON.stringify(j).slice(0, 80));
         }
+      } else {
+        lastErr = "HTTP " + r.status;
+        log("Worker error: HTTP " + r.status);
       }
     } catch (e) {
-      log("Global AI Error: " + e.message);
+      log("Network error: " + e.message);
       lastErr = e.message;
     }
   }
 
-  // NO FALLBACK - strictly AI or Error
+  // Error state — game still playable
   if (!scene) {
     scene = {
       narration: `⚠️ CONNECTION ERROR: ${lastErr || "Unknown"}. The Oracle is silent.`,
@@ -176,7 +136,6 @@ async function nextScene(choiceText = null) {
     };
   }
 
-  scene._source = sceneSource;
   state.scene = scene;
   state.history.push({ scene: scene.narration, choices: scene.choices, picked: null });
   renderScene();
@@ -185,7 +144,7 @@ async function nextScene(choiceText = null) {
 }
 
 function isValidScene(obj) {
-  return obj && typeof obj.narration === "string" && Array.isArray(obj.choices) && obj.choices.length === 4;
+  return obj && typeof obj.narration === "string" && Array.isArray(obj.choices) && obj.choices.length >= 2;
 }
 
 function localScene({ theme, hp, step, isBossStep }) {
@@ -221,7 +180,14 @@ function renderScene() {
     $("sceneMeta").innerHTML = `<span class="badge">${state.theme.toUpperCase()}</span><span class="badge">${tag}</span><span class="badge">RISK ${risk}</span>`;
   }
   if ($("aiStatus")) {
-    $("aiStatus").textContent = state.scene._source === "ai" ? "AI: CONNECTED" : "AI: FALLBACK";
+    const src = state.scene._source || "unknown";
+    if (src === "ai") {
+      $("aiStatus").textContent = "AI: " + (state.scene._model || "CONNECTED");
+    } else if (src === "fallback") {
+      $("aiStatus").textContent = "AI: OFFLINE (Lore Mode)";
+    } else {
+      $("aiStatus").textContent = "AI: ERROR";
+    }
   }
 
   const box = $("choices");
