@@ -1,6 +1,17 @@
 const $ = (id) => document.getElementById(id);
 const screens = ["menu", "theme", "scene", "wheel", "end"];
 
+// Native R1 AI Bridge
+let oracleResolver = null;
+window.onPluginMessage = function (data) {
+  console.log("R1 AI Message:", data);
+  // data.data is the string returned by the LLM
+  if (oracleResolver && data.data) {
+    oracleResolver(data.data);
+    oracleResolver = null;
+  }
+};
+
 const state = {
   hp: 10,
   step: 0,
@@ -81,20 +92,53 @@ async function nextScene(choiceText = null) {
       show("scene");
       $("narration").innerHTML = '<span class="loading">The Oracle is weaving your fate...</span>';
       $("choices").innerHTML = "";
-      const r = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(prompt),
-      });
-      if (r.ok) {
-        const j = await r.json();
-        if (isValidScene(j)) {
-          scene = j;
-          sceneSource = "ai";
+      // Try Native R1 AI First
+      if (typeof PluginMessageHandler !== "undefined") {
+        const fullPrompt = `You are a pixel RPG narrator. Context: ${JSON.stringify(prompt)}. RETURN ONLY JSON: {"narration":"...","choices":["...","...","...","..."],"risk":"low|mid|high","tag":"..."}`;
+
+        const responseData = await new Promise((resolve) => {
+          oracleResolver = resolve;
+          // Timeout after 15s if R1 AI hangs
+          setTimeout(() => resolve(null), 15000);
+
+          PluginMessageHandler.postMessage(JSON.stringify({
+            message: fullPrompt,
+            useLLM: true
+          }));
+        });
+
+        if (responseData) {
+          try {
+            const j = JSON.parse(responseData);
+            if (isValidScene(j)) {
+              scene = j;
+              sceneSource = "r1-native";
+            }
+          } catch (e) {
+            lastErr = "Native AI JSON error: " + e.message;
+          }
+        } else {
+          lastErr = "Native AI Timeout";
         }
-      } else {
-        const err = await r.json().catch(() => ({}));
-        lastErr = err.detail || `HTTP ${r.status}`;
+      }
+
+      // Fallback to Cloudflare/OpenRouter if Native fails or missing
+      if (!scene) {
+        const r = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(prompt),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          if (isValidScene(j)) {
+            scene = j;
+            sceneSource = "ai-worker";
+          }
+        } else {
+          const err = await r.json().catch(() => ({}));
+          lastErr = err.detail || `HTTP ${r.status}`;
+        }
       }
     } catch (e) {
       lastErr = e.message;
