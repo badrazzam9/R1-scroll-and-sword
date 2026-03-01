@@ -33,12 +33,11 @@
       let lastErr = null;
       let usedModel = null;
 
-      // ═════ ATTEMPT 1: Cloudflare Workers AI (3-model cascade) ═════
+      // ═════ ATTEMPT 1: Cloudflare Workers AI (70B primary) ═════
       if (env.AI) {
         const cfModels = [
           "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-          "@cf/meta/llama-3.1-8b-instruct",
-          "@cf/mistral/mistral-7b-instruct-v0.2"
+          "@cf/meta/llama-3.1-8b-instruct"
         ];
 
         for (const cfModel of cfModels) {
@@ -49,24 +48,38 @@
                 { role: "system", content: sys },
                 { role: "user", content: userMsg }
               ],
-              max_tokens: 250
+              max_tokens: 300
             });
 
-            // CF AI may return a string OR a parsed object depending on model
+            // Universal response extraction — handles ALL Cloudflare AI formats
             let obj = null;
-            if (typeof aiResp === "object" && aiResp !== null && !aiResp.response) {
-              // Direct parsed object (70B models sometimes do this)
-              obj = aiResp;
-            } else {
-              const rawText = typeof aiResp === "string" ? aiResp : (aiResp?.response || "");
-              obj = extractJSON(rawText);
+            if (typeof aiResp === "object" && aiResp !== null) {
+              if (aiResp.response !== undefined) {
+                // Standard CF format: { response: "..." } or { response: {...} }
+                const inner = aiResp.response;
+                if (typeof inner === "string") {
+                  obj = extractJSON(inner);
+                } else if (typeof inner === "object" && inner !== null) {
+                  obj = inner;
+                }
+              }
+              // Maybe the model returned the JSON directly at top level
+              if (!obj && aiResp.narration) {
+                obj = aiResp;
+              }
+              // Last resort: stringify and re-extract
+              if (!obj) {
+                obj = extractJSON(JSON.stringify(aiResp));
+              }
+            } else if (typeof aiResp === "string") {
+              obj = extractJSON(aiResp);
             }
 
             if (obj && isValid(obj)) {
               parsed = obj;
               usedModel = cfModel;
             } else {
-              lastErr = `CF ${cfModel}: invalid structure`;
+              lastErr = `CF ${cfModel}: invalid (got ${typeof aiResp})`;
             }
           } catch (e) {
             lastErr = `CF ${cfModel}: ${e.message}`;
