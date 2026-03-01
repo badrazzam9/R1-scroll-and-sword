@@ -9,9 +9,9 @@
 
     try {
       const body = await request.json();
-      const { theme, hp, act, step, previousChoice, history } = body || {};
+      const { theme, hp, step, previousChoice, history } = body || {};
 
-      if (!theme || !act || !step) {
+      if (!theme || !step) {
         return json({ error: "missing fields" }, 400);
       }
 
@@ -32,10 +32,9 @@
       };
 
       const user = {
-        game: "Scroll and Sword",
+        game: "Scroll and Sword (20 Steps Total)",
         theme,
         hp,
-        act,
         step,
         previousChoice: previousChoice || null,
         history: Array.isArray(history) ? history.slice(-6) : [],
