@@ -11,9 +11,9 @@
       const body = await request.json();
       const { theme, hp, step, previousChoice, history } = body || {};
 
-      if (!theme || !step) {
-        return json({ error: "missing fields" }, 400);
-      }
+      // Defaults for stability
+      const finalTheme = theme || "medieval";
+      const finalStep = step || 1;
 
       const sys = [
         "You are the narrator for a pixel RPG called Scroll and Sword.",
@@ -32,79 +32,99 @@
       };
 
       const user = {
-        game: "Scroll and Sword (20 Steps Total)",
-        theme,
-        hp,
-        step,
+        game: "Scroll and Sword (20 Steps)",
+        theme: finalTheme,
+        hp: hp || 10,
+        step: finalStep,
         previousChoice: previousChoice || null,
         history: Array.isArray(history) ? history.slice(-6) : [],
         outputSchema: schemaHint
       };
 
-      const models = [
-        "google/gemini-2.0-flash:free",
-        "google/gemini-1.5-flash:free",
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "mistralai/mistral-7b-instruct:free",
-        "google/gemma-2-9b-it:free",
-        "nousresearch/hermes-3-llama-3.1-8b:free",
-        "openrouter/auto-free",
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "microsoft/phi-3-mini-128k-instruct:free",
-        "qwen/qwen-2-7b-instruct:free"
-      ];
-
       let parsed = null;
       let lastErr = null;
       let usedModel = null;
 
-      for (const model of models) {
-        // Double retry for each model in case of transient 429/500
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
+      // ATTEMPT 1: Cloudflare Native AI (Absolute Stability)
+      if (env.AI) {
+        try {
+          const aiResp = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+            messages: [
+              { role: "system", content: sys },
+              { role: "user", content: JSON.stringify(user) }
+            ],
+            max_tokens: 300,
+            response_format: { type: "json_object" }
+          });
 
-            const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user, controller.signal);
-            clearTimeout(timeoutId);
-
-            let text = raw?.choices?.[0]?.message?.content || "{}";
-            text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) text = jsonMatch[0];
-
-            const obj = JSON.parse(text);
-            if (isValid(obj)) {
-              parsed = obj;
-              usedModel = model;
-              break;
-            }
-            lastErr = `Invalid JSON from ${model}: ${text.slice(0, 50)}`;
-          } catch (e) {
-            const isTimeout = e.name === "AbortError";
-            lastErr = `${model} ${isTimeout ? "TIMED OUT" : "FAILED"}: ${e.message || e}`;
-            if (attempt === 1) await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
+          if (isValid(aiResp)) {
+            parsed = aiResp;
+            usedModel = "@cf/llama-3.1-8b-instruct";
           }
+        } catch (e) {
+          lastErr = `Cloudflare AI Error: ${e.message}`;
         }
-        if (parsed) break;
       }
 
+      // ATTEMPT 2: OpenRouter 10-tier Fallback (Aggregator Stability)
       if (!parsed) {
-        return json({
-          error: "AI_EXHAUSTED",
-          detail: lastErr,
-          narration: "The Oracle remains silent after ten attempts. The stars are clouded.",
-          choices: ["RETRY ORACLE", "BACK TO MENU", "TRY DIFFERENT PATH", "FORCE AWAKENING"],
-          risk: "high",
-          tag: "hazard",
-          _source: "error"
-        }, 503);
-      }
+        const models = [
+          "google/gemini-2.0-flash:free",
+          "meta-llama/llama-3.1-8b-instruct:free",
+          "google/gemini-1.5-flash:free",
+          "mistralai/mistral-7b-instruct:free",
+          "google/gemma-2-9b-it:free",
+          "openrouter/auto-free"
+        ];
 
-      parsed._model = usedModel;
-      parsed._source = "ai";
-      return json(parsed, 200);
+        for (const model of models) {
+          // Double retry for each model in case of transient 429/500
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+              const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user, controller.signal);
+              clearTimeout(timeoutId);
+
+              let text = raw?.choices?.[0]?.message?.content || "{}";
+              text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+              const jsonMatch = text.match(/\{[\s\S]*\}/);
+              if (jsonMatch) text = jsonMatch[0];
+
+              const obj = JSON.parse(text);
+              if (isValid(obj)) {
+                parsed = obj;
+                usedModel = model;
+                break;
+              }
+              lastErr = `Invalid JSON from ${model}: ${text.slice(0, 50)}`;
+            } catch (e) {
+              const isTimeout = e.name === "AbortError";
+              lastErr = `${model} ${isTimeout ? "TIMED OUT" : "FAILED"}: ${e.message || e}`;
+              if (attempt === 1) await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
+            }
+          }
+          if (parsed) break;
+        }
+
+        if (!parsed) {
+          return json({
+            error: "AI_EXHAUSTED",
+            detail: lastErr,
+            narration: "The Oracle remains silent after ten attempts. The stars are clouded.",
+            choices: ["RETRY ORACLE", "BACK TO MENU", "TRY DIFFERENT PATH", "FORCE AWAKENING"],
+            risk: "high",
+            tag: "hazard",
+            _source: "error"
+          }, 503);
+        }
+
+        parsed._model = usedModel;
+        parsed._source = "ai";
+        return json(parsed, 200);
+      }
     } catch (e) {
       return json({
         narration: "A mechanical hush falls before danger returns.",

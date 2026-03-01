@@ -5,3 +5,6 @@ compatibility_date = "2026-02-28"
 [vars]
 MODEL_PRIMARY = "meta-llama/llama-3.1-8b-instruct:free"
 MODEL_FALLBACK = "meta-llama/llama-3.3-70b-instruct:free"
+
+[ai]
+binding = "AI"
