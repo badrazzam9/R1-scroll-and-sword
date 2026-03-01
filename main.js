@@ -91,14 +91,24 @@ async function nextScene(choiceText = null) {
           scene = j;
           sceneSource = "ai";
         }
+      } else {
+        const err = await r.json().catch(() => ({}));
+        lastErr = err.detail || `HTTP ${r.status}`;
       }
-    } catch { }
+    } catch (e) {
+      lastErr = e.message;
+    }
   }
 
-  // fallback
+  // NO FALLBACK - strictly AI or Error
   if (!scene) {
-    scene = localScene(prompt);
-    sceneSource = "fallback";
+    scene = {
+      narration: `⚠️ CONNECTION ERROR: ${lastErr || "Unknown"}. The Oracle is silent.`,
+      choices: ["RETRY CONNECTION", "BACK TO MENU", "CHECK STATUS", "FORCE RESET"],
+      risk: "high",
+      tag: "hazard",
+      _source: "error"
+    };
   }
 
   scene._source = sceneSource;
@@ -154,7 +164,14 @@ function renderScene() {
   state.scene.choices.forEach((c, i) => {
     const b = document.createElement("button");
     b.textContent = `${i + 1}. ${c}`;
-    b.onclick = () => pickChoice(i);
+    b.onclick = () => {
+      if (state.scene._source === "error" && i === 0) {
+        state.step -= 1; // back up step to retry same prompt
+        nextScene();
+      } else {
+        pickChoice(i);
+      }
+    };
     box.appendChild(b);
   });
 }
@@ -348,8 +365,13 @@ window.addEventListener("wheel", (e) => {
 // Polyfill Rabbit R1 Scroll Wheel (mapped to SDK commands)
 window.addEventListener("scrollUp", (e) => {
   if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity -= 0.08;
-    drawWheel();
+    wheel.velocity -= 0.12;
+    if (!wheel.spinning) {
+      wheel.spinning = true;
+      animateWheel();
+    } else {
+      drawWheel();
+    }
   } else {
     window.scrollBy(0, -50);
   }
@@ -357,8 +379,13 @@ window.addEventListener("scrollUp", (e) => {
 
 window.addEventListener("scrollDown", (e) => {
   if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity += 0.08;
-    drawWheel();
+    wheel.velocity += 0.12;
+    if (!wheel.spinning) {
+      wheel.spinning = true;
+      animateWheel();
+    } else {
+      drawWheel();
+    }
   } else {
     window.scrollBy(0, 50);
   }
