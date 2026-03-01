@@ -335,8 +335,9 @@ function animateWheel() {
   wheel.angle += wheel.velocity;
   wheel.velocity *= 0.985;
   drawWheel();
-  if (wheel.velocity < 0.002) {
+  if (Math.abs(wheel.velocity) < 0.002) {
     wheel.spinning = false;
+    wheel.velocity = 0; // stop completely
     const n = state.scene.choices.length;
     const norm = ((Math.PI * 1.5 - wheel.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
     const idx = Math.floor((norm / (Math.PI * 2)) * n) % n;
