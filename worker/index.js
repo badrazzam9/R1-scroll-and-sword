@@ -52,14 +52,21 @@
               max_tokens: 250
             });
 
-            const rawText = typeof aiResp === "string" ? aiResp : (aiResp?.response || "");
-            const obj = extractJSON(rawText);
+            // CF AI may return a string OR a parsed object depending on model
+            let obj = null;
+            if (typeof aiResp === "object" && aiResp !== null && !aiResp.response) {
+              // Direct parsed object (70B models sometimes do this)
+              obj = aiResp;
+            } else {
+              const rawText = typeof aiResp === "string" ? aiResp : (aiResp?.response || "");
+              obj = extractJSON(rawText);
+            }
 
             if (obj && isValid(obj)) {
               parsed = obj;
               usedModel = cfModel;
             } else {
-              lastErr = `CF ${cfModel} invalid: ${rawText.slice(0, 80)}`;
+              lastErr = `CF ${cfModel}: invalid structure`;
             }
           } catch (e) {
             lastErr = `CF ${cfModel}: ${e.message}`;
