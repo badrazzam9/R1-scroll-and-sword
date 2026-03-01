@@ -320,17 +320,126 @@ window.addEventListener("wheel", (e) => {
 
 // Menu bindings
 
+let saveScreenMode = "load"; // "save" or "load"
+
 document.querySelector('[data-action="new"]')?.addEventListener("click", () => show("theme"));
-document.querySelector('[data-action="resume"]')?.addEventListener("click", () => load() ? (renderScene(), show("scene")) : show("theme"));
+document.querySelector('[data-action="load"]')?.addEventListener("click", () => {
+  saveScreenMode = "load";
+  renderSaves();
+});
 
 document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener("click", () => newGame(b.dataset.theme)));
 
 $("restartBtn")?.addEventListener("click", () => show("menu"));
-$("backToMenuBtn")?.addEventListener("click", () => show("menu"));
+
+// Prompt modal when returning from gameplay
+function promptSaveModal() {
+  if (state.step > 0 && state.hp > 0) {
+    $("saveModal").style.display = "flex";
+  } else {
+    show("menu");
+  }
+}
+
+$("backToMenuBtn")?.addEventListener("click", () => promptSaveModal());
 $("backToMenuFromWheelBtn")?.addEventListener("click", () => {
   wheel.spinning = false;
+  promptSaveModal();
+});
+
+// Modal Actions
+$("modalSaveBtn")?.addEventListener("click", () => {
+  $("saveModal").style.display = "none";
+  saveScreenMode = "save";
+  renderSaves();
+});
+
+$("modalDiscardBtn")?.addEventListener("click", () => {
+  $("saveModal").style.display = "none";
   show("menu");
 });
+
+$("modalCancelBtn")?.addEventListener("click", () => {
+  $("saveModal").style.display = "none";
+});
+
+// Generic Saves Screen
+function getSlots() {
+  try {
+    const s = JSON.parse(localStorage.getItem("sas_slots"));
+    if (Array.isArray(s) && s.length === 3) return s;
+  } catch { }
+  return [null, null, null];
+}
+
+function saveSlots(slotsData) {
+  localStorage.setItem("sas_slots", JSON.stringify(slotsData));
+}
+
+function renderSaves() {
+  $("savesTitle").textContent = saveScreenMode === "save" ? "Save Game" : "Load Game";
+  const container = $("saveSlotsContainer");
+  container.innerHTML = "";
+
+  const slots = getSlots();
+
+  slots.forEach((slot, i) => {
+    const btn = document.createElement("button");
+    btn.className = "slot-btn" + (slot ? "" : " empty");
+
+    if (slot) {
+      const title = document.createElement("div");
+      title.className = "slot-title";
+      title.textContent = `Slot ${i + 1} - ${slot.theme ? slot.theme.toUpperCase() : "Unknown"}`;
+
+      const meta = document.createElement("div");
+      meta.className = "slot-meta";
+      meta.textContent = `Act ${slot.act} • Step ${slot.step} • HP ${slot.hp}`;
+
+      btn.appendChild(title);
+      btn.appendChild(meta);
+    } else {
+      btn.textContent = `Slot ${i + 1} - Empty`;
+    }
+
+    btn.onclick = () => handleSlotClick(i, slot);
+    container.appendChild(btn);
+  });
+
+  show("saves");
+}
+
+function handleSlotClick(idx, slotInfo) {
+  const slots = getSlots();
+  if (saveScreenMode === "load") {
+    if (!slotInfo) return alert("Slot is empty!");
+    Object.assign(state, JSON.parse(JSON.stringify(slotInfo)));
+    applyThemeClass();
+    renderScene();
+    show("scene");
+  } else {
+    // Save mode
+    if (slotInfo && !confirm("Overwrite this save?")) return;
+    slots[idx] = JSON.parse(JSON.stringify(state));
+    saveSlots(slots);
+    alert("Game Saved!");
+    show("menu");
+  }
+}
+
+$("savesBackBtn")?.addEventListener("click", () => {
+  if (saveScreenMode === "save") {
+    // If we were trying to save but backed out, just go to menu
+    show("menu");
+  } else {
+    show("menu");
+  }
+});
+
+function applyThemeClass() {
+  document.body.classList.remove("theme-medieval", "theme-noir", "theme-scifi");
+  if (state.theme) document.body.classList.add(`theme-${state.theme}`);
+}
 
 function initMenuSettings() {
   const seedInput = $("seedInput");
@@ -348,31 +457,6 @@ function initMenuSettings() {
     else localStorage.removeItem("sas_forced_seed");
 
     alert("Settings saved");
-  });
-
-  $("copySaveBtn")?.addEventListener("click", async () => {
-    const raw = localStorage.getItem("sas_save");
-    if (!raw) return alert("No save yet");
-    const code = btoa(unescape(encodeURIComponent(raw)));
-    try {
-      await navigator.clipboard.writeText(code);
-      alert("Save code copied");
-    } catch {
-      alert(code);
-    }
-  });
-
-  $("importSaveBtn")?.addEventListener("click", () => {
-    const input = $("importSaveInput")?.value.trim();
-    if (!input) return alert("Paste save code first");
-    try {
-      const json = decodeURIComponent(escape(atob(input)));
-      JSON.parse(json);
-      localStorage.setItem("sas_save", json);
-      alert("Save imported. Tap Resume.");
-    } catch {
-      alert("Invalid save code");
-    }
   });
 }
 
