@@ -69,6 +69,7 @@ async function nextScene(choiceText = null) {
   };
 
   let scene = null;
+  let sceneSource = "fallback";
 
   // AI-first
   if (API_URL) {
@@ -80,14 +81,21 @@ async function nextScene(choiceText = null) {
       });
       if (r.ok) {
         const j = await r.json();
-        if (isValidScene(j)) scene = j;
+        if (isValidScene(j)) {
+          scene = j;
+          sceneSource = "ai";
+        }
       }
     } catch {}
   }
 
   // fallback
-  if (!scene) scene = localScene(prompt);
+  if (!scene) {
+    scene = localScene(prompt);
+    sceneSource = "fallback";
+  }
 
+  scene._source = sceneSource;
   state.scene = scene;
   state.history.push({ scene: scene.narration, choices: scene.choices, picked: null });
   renderScene();
@@ -133,6 +141,9 @@ function renderScene() {
   }
   if ($("inventory")) {
     $("inventory").innerHTML = state.inventory.length ? state.inventory.map(i => `<span class="inv-item">${i}</span>`).join("") : `<span class="inv-item">No items</span>`;
+  }
+  if ($("aiStatus")) {
+    $("aiStatus").textContent = state.scene._source === "ai" ? "AI: CONNECTED" : "AI: FALLBACK";
   }
 
   const box = $("choices");
