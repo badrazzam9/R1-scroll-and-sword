@@ -16,6 +16,7 @@ let API_URL = localStorage.getItem("sas_api_url") || "https://scroll-and-sword-a
 let forcedSeed = localStorage.getItem("sas_forced_seed") || "";
 
 function show(screen) {
+  state.currentScreen = screen;
   screens.forEach((s) => $(s).classList.remove("active"));
   $(screen).classList.add("active");
   if ($("hp")) $("hp").textContent = state.hp;
@@ -365,30 +366,26 @@ window.addEventListener("wheel", (e) => {
 
 // Polyfill Rabbit R1 Scroll Wheel (mapped to SDK commands)
 window.addEventListener("scrollUp", (e) => {
-  if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity -= 0.12;
+  if (state.currentScreen === "wheel") {
+    wheel.velocity -= 0.35; // Significant push
     if (!wheel.spinning) {
       wheel.spinning = true;
       animateWheel();
-    } else {
-      drawWheel();
     }
   } else {
-    window.scrollBy(0, -50);
+    window.scrollBy(0, -60);
   }
 });
 
 window.addEventListener("scrollDown", (e) => {
-  if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity += 0.12;
+  if (state.currentScreen === "wheel") {
+    wheel.velocity += 0.35; // Significant push
     if (!wheel.spinning) {
       wheel.spinning = true;
       animateWheel();
-    } else {
-      drawWheel();
     }
   } else {
-    window.scrollBy(0, 50);
+    window.scrollBy(0, 60);
   }
 });
 

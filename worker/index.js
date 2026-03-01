@@ -43,16 +43,16 @@
       };
 
       const models = [
-        "meta-llama/llama-3.1-8b-instruct:free",
         "google/gemini-2.0-flash:free",
-        "google/gemini-2.0-flash-lite-preview-02-05:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-1.5-flash:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
         "mistralai/mistral-7b-instruct:free",
-        "nousresearch/hermes-3-llama-3.1-8b:free",
         "google/gemma-2-9b-it:free",
+        "nousresearch/hermes-3-llama-3.1-8b:free",
+        "openrouter/auto-free",
+        "meta-llama/llama-3.3-70b-instruct:free",
         "microsoft/phi-3-mini-128k-instruct:free",
-        "qwen/qwen2.5-72b-instruct:free",
-        "openrouter/auto-free"
+        "qwen/qwen-2-7b-instruct:free"
       ];
 
       let parsed = null;
@@ -60,31 +60,35 @@
       let usedModel = null;
 
       for (const model of models) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+        // Double retry for each model in case of transient 429/500
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-          const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user, controller.signal);
-          clearTimeout(timeoutId);
+            const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user, controller.signal);
+            clearTimeout(timeoutId);
 
-          let text = raw?.choices?.[0]?.message?.content || "{}";
-          text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+            let text = raw?.choices?.[0]?.message?.content || "{}";
+            text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) text = jsonMatch[0];
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) text = jsonMatch[0];
 
-          const obj = JSON.parse(text);
-          if (isValid(obj)) {
-            parsed = obj;
-            usedModel = model;
-            break;
+            const obj = JSON.parse(text);
+            if (isValid(obj)) {
+              parsed = obj;
+              usedModel = model;
+              break;
+            }
+            lastErr = `Invalid JSON from ${model}: ${text.slice(0, 50)}`;
+          } catch (e) {
+            const isTimeout = e.name === "AbortError";
+            lastErr = `${model} ${isTimeout ? "TIMED OUT" : "FAILED"}: ${e.message || e}`;
+            if (attempt === 1) await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
           }
-          lastErr = `Invalid JSON from ${model}: ${text.slice(0, 50)}`;
-        } catch (e) {
-          const isTimeout = e.name === "AbortError";
-          lastErr = `${model} ${isTimeout ? "TIMED OUT" : "FAILED"}: ${e.message || e}`;
-          console.log(lastErr);
         }
+        if (parsed) break;
       }
 
       if (!parsed) {
