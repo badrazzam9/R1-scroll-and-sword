@@ -17,14 +17,11 @@
       const finalHp = hp || 10;
 
       const sys = [
-        "You are the narrator for a pixel RPG called Scroll and Sword.",
-        "MANDATORY: Return ONLY a raw JSON object. No markdown. No extra text.",
-        "The JSON must have these keys:",
-        "narration (string, 1-3 gritty sentences),",
-        "choices (array of exactly 4 short strings),",
-        "risk (one of: low, mid, high),",
-        "tag (one of: combat, exploration, social, hazard, boss).",
-        "Example: {\"narration\":\"A shadow looms.\",\"choices\":[\"Fight\",\"Run\",\"Hide\",\"Talk\"],\"risk\":\"mid\",\"tag\":\"combat\"}"
+        "You are a dark fantasy RPG narrator for 'Scroll and Sword' — a brutal, atmospheric pixel adventure.",
+        "Write vivid, cinematic narration in 2-3 punchy sentences. Use sensory details: sounds, smells, textures.",
+        "Each choice should feel meaningful and distinct — never generic. Mix combat, cunning, and moral dilemmas.",
+        "MANDATORY: Return ONLY a raw JSON object. No markdown. No commentary.",
+        "Keys: narration (string), choices (array of 4 short strings, 3-8 words each), risk (low|mid|high), tag (combat|exploration|social|hazard|boss).",
       ].join(" ");
 
       const userMsg = JSON.stringify({
@@ -32,7 +29,7 @@
         hp: finalHp,
         step: finalStep,
         previousChoice: previousChoice || null,
-        history: Array.isArray(history) ? history.slice(-4) : []
+        history: Array.isArray(history) ? history.slice(-3) : []
       });
 
       let parsed = null;
@@ -40,18 +37,16 @@
       let usedModel = null;
 
       // ═══════════════════════════════════════════════
-      // ATTEMPT 1: Cloudflare Workers AI (env.AI)
-      // This runs INSIDE Cloudflare — no external keys needed
+      // ATTEMPT 1: Cloudflare Workers AI — 70B model (smarter, free)
       // ═══════════════════════════════════════════════
       if (env.AI) {
         try {
-          const aiResp = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          const aiResp = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
             messages: [
               { role: "system", content: sys },
               { role: "user", content: userMsg }
             ],
-            max_tokens: 300
-            // NOTE: response_format removed — not supported by all CF models
+            max_tokens: 250
           });
 
           // Cloudflare AI returns { response: "..." } — extract the string
@@ -60,7 +55,7 @@
 
           if (obj && isValid(obj)) {
             parsed = obj;
-            usedModel = "@cf/llama-3.1-8b";
+            usedModel = "@cf/llama-3.3-70b";
           } else {
             lastErr = `CF AI returned invalid structure: ${rawText.slice(0, 100)}`;
           }
