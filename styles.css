@@ -224,14 +224,8 @@ button.selected {
   padding: 10px;
   border-radius: 10px;
   min-height: 120px;
-  max-height: 156px;
-  overflow-y: auto;
   margin-bottom: 10px;
   font-size: 24px
-}
-
-.narration::-webkit-scrollbar {
-  display: none;
 }
 
 .choices button {

@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Scroll & Sword</title>
-  <link rel="stylesheet" href="./styles.css?v=2" />
+  <link rel="stylesheet" href="./styles.css?v=5" />
 </head>
 
 <body>
@@ -17,7 +17,6 @@
       <h1>⚔️ Scroll & Sword</h1>
       <div class="stats" style="display:none;">
         <span>HP: <b id="hp">10</b></span>
-        <span>Act: <b id="act">1</b>/3</span>
         <span>Gold: <b id="gold">0</b></span>
       </div>
     </header>
@@ -45,7 +44,6 @@
     <section id="scene" class="screen">
       <div id="sceneMeta" class="scene-meta"></div>
       <div id="aiStatus" class="small">AI: checking...</div>
-      <div id="inventory" class="inventory"></div>
       <article id="narration" class="narration"></article>
       <div id="choices" class="choices"></div>
       <button id="wheelBtn" class="fate">🎡 Wheel of Fate</button>
@@ -65,16 +63,18 @@
       <p id="endText"></p>
       <button id="restartBtn">Back to Menu</button>
     </section>
+  </main>
 
-    <!-- Generic Save/Load Screen -->
-    <section id="saves" class="screen">
-      <h2 id="savesTitle">Select Slot</h2>
+  <!-- Generic Save/Load Screen Modal -->
+  <div id="savesModal" class="modal" style="display:none;">
+    <div class="modal-content screen">
+      <h3 id="savesTitle" style="margin-top:0; text-align:center;">Select Slot</h3>
       <div id="saveSlotsContainer">
         <!-- Slots injected here via JS -->
       </div>
-      <button id="savesBackBtn" class="secondary" style="margin-top: 10px;">Back</button>
-    </section>
-  </main>
+      <button id="savesBackBtn" class="secondary" style="margin-top: 10px;">Cancel</button>
+    </div>
+  </div>
 
   <!-- Save Confirmation Modal -->
   <div id="saveModal" class="modal" style="display:none;">
@@ -87,7 +87,7 @@
     </div>
   </div>
 
-  <script type="module" src="./main.js?v=4"></script>
+  <script type="module" src="./main.js?v=5"></script>
 </body>
 
 </html>

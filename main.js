@@ -3,14 +3,12 @@ const screens = ["menu", "theme", "scene", "wheel", "end"];
 
 const state = {
   hp: 10,
-  act: 1,
   step: 0,
   theme: null,
   seed: Math.floor(Math.random() * 1e9),
   history: [],
   scene: null,
   gold: 0,
-  inventory: [],
   bossesDefeated: 0,
 };
 
@@ -21,7 +19,6 @@ function show(screen) {
   screens.forEach((s) => $(s).classList.remove("active"));
   $(screen).classList.add("active");
   if ($("hp")) $("hp").textContent = state.hp;
-  if ($("act")) $("act").textContent = state.act;
   if ($("gold")) $("gold").textContent = state.gold;
 
   // Hide stats on menu and meta screens
@@ -51,14 +48,12 @@ function seeded(n = 1) {
 function newGame(theme) {
   Object.assign(state, {
     hp: 10,
-    act: 1,
     step: 0,
     theme,
     history: [],
     scene: null,
     seed: forcedSeed ? Number(forcedSeed) : Math.floor(Math.random() * 1e9),
     gold: 0,
-    inventory: [],
     bossesDefeated: 0,
   });
   nextScene();
@@ -66,16 +61,14 @@ function newGame(theme) {
 
 async function nextScene(choiceText = null) {
   state.step += 1;
-  state.act = Math.min(3, Math.ceil(state.step / 4));
 
   const prompt = {
     theme: state.theme,
     hp: state.hp,
-    act: state.act,
     step: state.step,
     previousChoice: choiceText,
     history: state.history.slice(-6),
-    isBossStep: state.step % 4 === 0,
+    isBossStep: state.step > 0 && state.step % 5 === 0,
   };
 
   let scene = null;
@@ -120,7 +113,7 @@ function isValidScene(obj) {
   return obj && typeof obj.narration === "string" && Array.isArray(obj.choices) && obj.choices.length === 4;
 }
 
-function localScene({ theme, hp, act, step, isBossStep }) {
+function localScene({ theme, hp, step, isBossStep }) {
   const pools = {
     medieval: ["A torchlit corridor groans beneath your boots.", "A hooded ranger blocks the ruined gate.", "The village bell rings thrice at midnight."],
     noir: ["Rain crawls down neon windows as a saxophone fades.", "A black sedan idles outside the diner.", "A letter arrives with no return address."],
@@ -129,14 +122,14 @@ function localScene({ theme, hp, act, step, isBossStep }) {
 
   if (isBossStep) {
     return {
-      narration: `⚠️ Boss chapter of Act ${act}. Your next move decides everything.`,
+      narration: `⚠️ A powerful foe emerges. Your next move decides everything.`,
       choices: ["All-in assault", "Exploit weakness", "Defensive posture", "Risky deception"],
       risk: "high",
       tag: "boss",
     };
   }
 
-  const narr = pools[theme][(step + act) % pools[theme].length] + ` You feel ${hp <= 4 ? "wounded" : "ready"}.`;
+  const narr = pools[theme][step % pools[theme].length] + ` You feel ${hp <= 4 ? "wounded" : "ready"}.`;
   return {
     narration: narr,
     choices: ["Investigate carefully", "Confront directly", "Retreat and regroup", "Use an improvised trick"],
@@ -151,9 +144,6 @@ function renderScene() {
     const risk = (state.scene.risk || "mid").toUpperCase();
     const tag = (state.scene.tag || "exploration").toUpperCase();
     $("sceneMeta").innerHTML = `<span class="badge">${state.theme.toUpperCase()}</span><span class="badge">${tag}</span><span class="badge">RISK ${risk}</span>`;
-  }
-  if ($("inventory")) {
-    $("inventory").innerHTML = state.inventory.length ? state.inventory.map(i => `<span class="inv-item">${i}</span>`).join("") : `<span class="inv-item">No items</span>`;
   }
   if ($("aiStatus")) {
     $("aiStatus").textContent = state.scene._source === "ai" ? "AI: CONNECTED" : "AI: FALLBACK";
@@ -207,13 +197,9 @@ function pickChoice(i) {
 
   if (hpLoss === 0 && risk < 2 && state.hp < 10) state.hp += 1; // minor heal
   else state.hp -= hpLoss;
-  if (seeded(10) > 0.7 && state.inventory.length < 6) {
-    const loot = ["Lucky Coin", "Medkit", "Rune Shard", "Smoke Capsule"][Math.floor(seeded(11) * 4)];
-    state.inventory.push(loot);
-  }
 
   if (state.hp <= 0) return endGame(false, `You chose: ${choice}. Fate was cruel.`);
-  if (state.step >= 12) return endGame(true, `You survived the ${state.theme} saga.`);
+  if (state.step >= 20) return endGame(true, `You survived your perilous journey!`);
   nextScene(choice);
 }
 
@@ -351,35 +337,23 @@ $("releaseBtn")?.addEventListener("click", () => {
   animateWheel();
 });
 window.addEventListener("wheel", (e) => {
+  // Only capture wheel events for the Wheel of Fate canvas
   if ($("wheel")?.classList.contains("active")) {
     e.preventDefault();
     wheel.velocity += (e.deltaY > 0 ? 0.05 : -0.05);
     drawWheel();
-  } else if ($("scene")?.classList.contains("active")) {
-    const narr = $("narration");
-    if (narr) narr.scrollTop += (e.deltaY > 0 ? 50 : -50);
-  } else {
-    window.scrollBy(0, e.deltaY > 0 ? 50 : -50);
   }
 }, { passive: false });
 
 // Polyfill Rabbit R1 Scroll Wheel (mapped to Arrow keys)
 window.addEventListener("keydown", (e) => {
   if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-    const isDown = e.key === "ArrowDown";
-
     if ($("wheel")?.classList.contains("active")) {
       e.preventDefault();
-      wheel.velocity += isDown ? 0.08 : -0.08;
+      wheel.velocity += (e.key === "ArrowDown") ? 0.08 : -0.08;
       drawWheel();
-    } else if ($("scene")?.classList.contains("active")) {
-      e.preventDefault();
-      const narr = $("narration");
-      if (narr) narr.scrollTop += isDown ? 50 : -50;
-    } else {
-      // For menu screens let native scrolling handle it, or force body scroll
-      window.scrollBy(0, isDown ? 50 : -50);
     }
+    // Let default behavior handle document scrolling natively for the rest of the app!
   }
 });
 
@@ -459,7 +433,7 @@ function renderSaves() {
 
       const meta = document.createElement("div");
       meta.className = "slot-meta";
-      meta.textContent = `Act ${slot.act} • Step ${slot.step} • HP ${slot.hp}`;
+      meta.textContent = `Step ${slot.step} • HP ${slot.hp}`;
 
       btn.appendChild(title);
       btn.appendChild(meta);
@@ -471,13 +445,14 @@ function renderSaves() {
     container.appendChild(btn);
   });
 
-  show("saves");
+  $("savesModal").style.display = "flex";
 }
 
 function handleSlotClick(idx, slotInfo) {
   const slots = getSlots();
   if (saveScreenMode === "load") {
     if (!slotInfo) return alert("Slot is empty!");
+    $("savesModal").style.display = "none";
     Object.assign(state, JSON.parse(JSON.stringify(slotInfo)));
     applyThemeClass();
     renderScene();
@@ -488,15 +463,15 @@ function handleSlotClick(idx, slotInfo) {
     slots[idx] = JSON.parse(JSON.stringify(state));
     saveSlots(slots);
     alert("Game Saved!");
+    $("savesModal").style.display = "none";
     show("menu");
   }
 }
 
 $("savesBackBtn")?.addEventListener("click", () => {
+  $("savesModal").style.display = "none";
   if (saveScreenMode === "save") {
     // If we were trying to save but backed out, just go to menu
-    show("menu");
-  } else {
     show("menu");
   }
 });
