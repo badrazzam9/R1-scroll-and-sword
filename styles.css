@@ -1,33 +1,41 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Press+Start+2P&display=swap');
 
 :root {
-  --bg: #121323;
-  --panel: #1b1d34;
-  --text: #e9ecff;
-  --accent: #6ea8ff;
-  --danger: #ff6b6b;
-  --ok: #7ef07e;
+  --bg: #0c0e1a;
+  --panel: #14172b;
+  --card: #1a1e36;
+  --text: #e4e8ff;
+  --text-dim: #8b90b0;
+  --accent: #6e8eff;
+  --danger: #ff5c5c;
+  --ok: #5cff8a;
+  --warn: #ffd86b;
+  --glow: #6e8eff33;
+  --radius: 14px;
 }
 
 * {
-  box-sizing: border-box
+  box-sizing: border-box;
+  margin: 0;
 }
 
 body {
-  margin: 0;
-  background: radial-gradient(circle at 20% 0%, #1f2142 0%, #111426 45%, #0b0d18 100%);
+  background: var(--bg);
   color: var(--text);
-  font-family: "VT323", system-ui, sans-serif;
-  letter-spacing: .3px;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* Scanline overlay */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom, #ffffff08 0 1px, transparent 1px 3px);
-  opacity: .25;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, #ffffff03 2px 3px);
+  z-index: 999;
 }
 
 .app {
@@ -36,214 +44,264 @@ body::after {
   min-height: 100vh;
   padding: 12px;
   position: relative;
-  z-index: 1
+  z-index: 1;
 }
 
+/* ═══ Topbar ═══ */
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  padding: 8px 0;
+  margin-bottom: 12px;
   position: sticky;
   top: 0;
   background: var(--bg);
-  padding: 5px 0;
   z-index: 50;
-  border-bottom: 1px solid #ffffff14;
+  border-bottom: 1px solid #ffffff0a;
 }
 
 .topbar h1 {
   font-family: "Press Start 2P", monospace;
-  font-size: 14px;
-  line-height: 1.4;
-  margin: 0;
-  color: #dce7ff;
-  text-shadow: 0 0 10px #6ea8ff66
+  font-size: 13px;
+  color: var(--accent);
+  text-shadow: 0 0 16px var(--glow);
 }
 
 .stats {
   display: flex;
-  gap: 10px;
-  font-size: 14px
+  gap: 8px;
+  align-items: center;
 }
 
+.hp-badge,
+.step-badge {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: #1e2245;
+  border: 1px solid #ffffff12;
+}
+
+.hp-badge {
+  color: var(--danger);
+}
+
+.step-badge {
+  color: var(--text-dim);
+}
+
+/* ═══ Screens ═══ */
 .screen {
   display: none;
   background: var(--panel);
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid #ffffff14;
-  box-shadow: 0 10px 24px #0008
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid #ffffff0a;
+  box-shadow: 0 8px 32px #0004;
 }
 
 .screen.active {
-  display: block
+  display: block;
 }
 
+/* ═══ Menu ═══ */
+.menu-hero {
+  text-align: center;
+  padding: 20px 0 16px;
+}
+
+.menu-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 20px var(--glow));
+}
+
+.menu-title {
+  font-family: "Press Start 2P", monospace;
+  font-size: 16px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.menu-tagline {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ═══ Theme Cards ═══ */
+.theme-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.theme-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid #ffffff0f;
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-card:hover,
+.theme-card:active {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--glow);
+  transform: translateY(-1px);
+}
+
+.theme-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.theme-name {
+  font-weight: 700;
+  font-size: 16px;
+  display: block;
+  color: var(--text);
+}
+
+.theme-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  display: block;
+}
+
+/* ═══ Buttons ═══ */
 button {
   width: 100%;
   padding: 12px;
-  margin: 6px 0;
-  border: 1px solid #ffffff1f;
-  border-radius: 10px;
-  background: #2a2f53;
+  margin: 5px 0;
+  border: 1px solid #ffffff14;
+  border-radius: var(--radius);
   color: var(--text);
   font-weight: 600;
   font-family: inherit;
-  font-size: 18px
-}
-
-button.secondary {
-  background: #1d233f;
-  border-color: #ffffff29
-}
-
-button:hover {
-  filter: brightness(1.12);
-  cursor: pointer
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 button:active {
-  transform: translateY(1px)
+  transform: scale(0.98);
 }
 
-button.selected {
-  outline: 2px solid var(--accent);
-  background: #30427a
+.btn-primary {
+  background: linear-gradient(135deg, #3b4fd4, #6e8eff);
+  border: none;
+  font-size: 17px;
+  box-shadow: 0 4px 16px #3b4fd444;
+}
+
+.btn-secondary {
+  background: var(--card);
+  border-color: #ffffff18;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: #ffffff10;
+  color: var(--text-dim);
+  font-size: 14px;
 }
 
 .fate {
-  background: #4e2f6d;
-  animation: fate-glow 2s infinite alternate;
+  background: linear-gradient(135deg, #4a2d7a, #7b44c9);
+  border: none;
+  box-shadow: 0 0 16px #7b44c933;
+  animation: fate-pulse 2.5s ease-in-out infinite;
 }
 
-@keyframes fate-glow {
-  0% {
-    box-shadow: 0 0 5px #6e3f94;
-  }
+@keyframes fate-pulse {
 
+  0%,
   100% {
-    box-shadow: 0 0 15px #9a5cd6;
-    border-color: #9a5cd6;
+    box-shadow: 0 0 8px #7b44c922;
+  }
+
+  50% {
+    box-shadow: 0 0 20px #7b44c955;
   }
 }
 
-.settings,
-.save-tools {
-  margin-top: 10px;
-  padding: 8px;
-  background: #11152d;
-  border-radius: 10px;
-  border: 1px solid #ffffff1c
-}
-
-.row-inline {
+/* ═══ Scene ═══ */
+.scene-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  margin: 4px 0 8px
-}
-
-.settings input,
-.save-tools input {
-  width: 100%;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid #ffffff22;
-  background: #0f1330;
-  color: var(--text);
-  margin: 4px 0
-}
-
-@media (max-width:380px) {
-  .app {
-    padding: 8px
-  }
-
-  .topbar h1 {
-    font-size: 12px
-  }
-
-  button {
-    font-size: 16px;
-    padding: 10px
-  }
-
-  .narration {
-    font-size: 22px;
-    min-height: 100px
-  }
-}
-
-.small {
-  opacity: .75;
-  font-size: 14px;
-  text-align: center
+  margin-bottom: 10px;
 }
 
 .scene-meta {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px
-}
-
-.inventory {
-  display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 8px
-}
-
-.inv-item {
-  font-size: 12px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #2c2548;
-  border: 1px solid #ffffff22
 }
 
 .badge {
-  font-size: 13px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   padding: 3px 8px;
-  border-radius: 999px;
-  background: #101633;
-  border: 1px solid #ffffff22
+  border-radius: 6px;
+  background: #1a1e36;
+  border: 1px solid #ffffff10;
+  color: var(--text-dim);
 }
 
-.badge.risk-low {
-  color: var(--ok)
-}
-
-.badge.risk-mid {
-  color: #ffd86b
-}
-
-.badge.risk-high {
-  color: var(--danger)
+.ai-status {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .narration {
-  line-height: 1.5;
-  background: #11152d;
-  padding: 10px;
-  border-radius: 10px;
-  min-height: 120px;
+  line-height: 1.6;
+  background: var(--card);
+  padding: 14px;
+  border-radius: var(--radius);
   margin-bottom: 10px;
-  font-size: 24px
+  font-size: 18px;
+  border-left: 3px solid var(--accent);
 }
 
 .choices button {
-  background: #24305f;
+  background: #1e2548;
   text-align: left;
-  font-size: 20px
+  font-size: 16px;
+  border-left: 3px solid transparent;
+  padding-left: 14px;
+  transition: all 0.15s ease;
+}
+
+.choices button:hover,
+.choices button:active {
+  border-left-color: var(--accent);
+  background: #252d58;
+}
+
+.scene-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scene-actions button {
+  flex: 1;
 }
 
 .loading {
-  font-size: 22px;
+  font-size: 18px;
   color: var(--accent);
-  white-space: pre-wrap;
   animation: pulse 1.5s infinite;
 }
 
@@ -251,56 +309,55 @@ button.selected {
 
   0%,
   100% {
-    opacity: 1
+    opacity: 1;
   }
 
   50% {
-    opacity: 0.5
+    opacity: 0.4;
   }
 }
 
+/* ═══ Wheel ═══ */
 #wheel {
-  text-align: center
+  text-align: center;
 }
 
 canvas {
   background: #0f1120;
   border-radius: 50%;
   display: block;
-  margin: 8px auto;
-  border: 2px solid #ffffff26
+  margin: 12px auto;
+  border: 2px solid #ffffff14;
+  box-shadow: 0 0 24px #6e8eff11;
 }
 
-#endTitle {
-  margin-top: 0
+/* ═══ End Screen ═══ */
+.end-hero {
+  text-align: center;
+  padding: 24px 0;
 }
 
-/* Theme accents */
-body.theme-medieval .fate {
-  background: #6d4a2f
+.end-hero h2 {
+  font-family: "Press Start 2P", monospace;
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: var(--accent);
 }
 
-body.theme-medieval .topbar h1 {
-  text-shadow: 0 0 10px #d7a15a66
+.end-hero p {
+  color: var(--text-dim);
+  margin-bottom: 20px;
 }
 
-body.theme-noir .fate {
-  background: #3b3b3b
+/* ═══ Hint Text ═══ */
+.hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 12px;
 }
 
-body.theme-noir .topbar h1 {
-  text-shadow: 0 0 10px #9fc5ff44
-}
-
-body.theme-scifi .fate {
-  background: #2f6d61
-}
-
-body.theme-scifi .topbar h1 {
-  text-shadow: 0 0 12px #63ffd966
-}
-
-/* Modal — centered on screen */
+/* ═══ Modal ═══ */
 .modal {
   position: fixed;
   inset: 0;
@@ -313,67 +370,114 @@ body.theme-scifi .topbar h1 {
 }
 
 .modal-content {
-  display: block;
   width: 100%;
   max-width: 400px;
-  border: 2px solid #ffffff33;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px #000;
+  border: 1px solid #ffffff14;
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px #000;
   padding: 20px 14px;
   background: var(--panel);
 }
 
 .modal-content h3 {
-  margin-top: 0;
+  margin: 0 0 12px;
   text-align: center;
-}
-
-.slot-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  background: #242a4a;
-  padding: 10px;
-  min-height: 60px;
-  font-size: 16px;
-}
-
-.slot-btn .slot-title {
-  font-weight: bold;
-  color: var(--accent);
-  margin-bottom: 4px;
   font-size: 18px;
 }
 
+/* ═══ Save Slots ═══ */
+.slot-btn {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--card);
+  padding: 10px;
+  min-height: 52px;
+  font-size: 15px;
+}
+
+.slot-btn .slot-title {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 16px;
+}
+
 .slot-btn .slot-meta {
-  font-size: 14px;
-  opacity: 0.8;
-  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .slot-btn.empty {
-  opacity: 0.6;
-  align-items: center;
-  justify-content: center;
+  opacity: 0.5;
+  text-align: center;
   font-style: italic;
 }
 
+/* ═══ Debug ═══ */
 .debug-log {
   font-size: 10px;
-  color: #aaa;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 4px;
-  margin-top: 5px;
-  border-radius: 3px;
-  max-height: 45px;
+  color: #666;
+  margin-top: 6px;
+  max-height: 30px;
   overflow: hidden;
-  text-align: left;
 }
 
-.version-stamp {
-  font-size: 10px;
-  color: #ffffff44;
-  margin-top: 10px;
-  text-align: center;
+/* ═══ Theme Accents ═══ */
+body.theme-medieval .topbar h1 {
+  color: #d4a55a;
+  text-shadow: 0 0 12px #d4a55a33;
+}
+
+body.theme-medieval .narration {
+  border-left-color: #d4a55a;
+}
+
+body.theme-medieval .fate {
+  background: linear-gradient(135deg, #5a3a1a, #8b6530);
+}
+
+body.theme-noir .topbar h1 {
+  color: #8ba8cc;
+  text-shadow: 0 0 12px #8ba8cc33;
+}
+
+body.theme-noir .narration {
+  border-left-color: #8ba8cc;
+}
+
+body.theme-noir .fate {
+  background: linear-gradient(135deg, #2a2a3a, #4a4a5a);
+}
+
+body.theme-scifi .topbar h1 {
+  color: #5affd0;
+  text-shadow: 0 0 12px #5affd033;
+}
+
+body.theme-scifi .narration {
+  border-left-color: #5affd0;
+}
+
+body.theme-scifi .fate {
+  background: linear-gradient(135deg, #1a4a40, #2d7a6a);
+}
+
+/* ═══ Responsive ═══ */
+@media (max-width: 380px) {
+  .app {
+    padding: 8px;
+  }
+
+  .topbar h1 {
+    font-size: 11px;
+  }
+
+  .narration {
+    font-size: 16px;
+  }
+
+  button {
+    font-size: 15px;
+    padding: 10px;
+  }
 }

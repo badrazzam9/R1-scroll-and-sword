@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Scroll & Sword</title>
-  <link rel="stylesheet" href="./styles.css?v=13" />
+  <link rel="stylesheet" href="./styles.css?v=23" />
 </head>
 
 <body>
@@ -16,63 +16,85 @@
     <header class="topbar">
       <h1>⚔️ Scroll & Sword</h1>
       <div class="stats" style="display:none;">
-        <span>HP: <b id="hp">10</b></span>
+        <span class="hp-badge">❤️ <b id="hp">10</b></span>
+        <span id="stepBadge" class="step-badge">1/20</span>
       </div>
     </header>
 
+    <!-- Main Menu -->
     <section id="menu" class="screen active">
-      <h2>Menu</h2>
-      <button data-action="new">New Game</button>
-      <button data-action="load">Load Game</button>
-
-      <div class="settings">
-        <input id="seedInput" type="number" placeholder="Optional seed (e.g. 12345)" />
-        <button id="saveSettingsBtn">Save Settings</button>
+      <div class="menu-hero">
+        <div class="menu-icon">⚔️</div>
+        <h2 class="menu-title">Scroll & Sword</h2>
+        <p class="menu-tagline">A 20-step dark RPG. Every choice matters.</p>
       </div>
-
-      <p class="small">Scroll to move • Press to select</p>
+      <button data-action="new" class="btn-primary">🗡️ New Adventure</button>
+      <button data-action="load" class="btn-secondary">📜 Continue Saga</button>
+      <p class="hint">Scroll to navigate • Press to select</p>
     </section>
 
+    <!-- Theme Selection -->
     <section id="theme" class="screen">
-      <h2>Choose Lore Theme</h2>
-      <button data-theme="medieval">Medieval</button>
-      <button data-theme="noir">Modern / Retro Noir</button>
-      <button data-theme="scifi">Sci‑Fi</button>
+      <h2>Choose Your World</h2>
+      <div class="theme-grid">
+        <button data-theme="medieval" class="theme-card">
+          <span class="theme-icon">🏰</span>
+          <span class="theme-name">Medieval</span>
+          <span class="theme-desc">Swords, castles, betrayal</span>
+        </button>
+        <button data-theme="noir" class="theme-card">
+          <span class="theme-icon">🔫</span>
+          <span class="theme-name">Noir</span>
+          <span class="theme-desc">Rain, secrets, revenge</span>
+        </button>
+        <button data-theme="scifi" class="theme-card">
+          <span class="theme-icon">🚀</span>
+          <span class="theme-name">Sci-Fi</span>
+          <span class="theme-desc">Space, tech, survival</span>
+        </button>
+      </div>
     </section>
 
+    <!-- Gameplay Screen -->
     <section id="scene" class="screen">
-      <div id="sceneMeta" class="scene-meta"></div>
-      <div id="aiStatus" class="small">AI: checking...</div>
+      <div class="scene-header">
+        <div id="sceneMeta" class="scene-meta"></div>
+        <div id="aiStatus" class="ai-status">AI: Connecting...</div>
+      </div>
       <article id="narration" class="narration"></article>
       <div id="choices" class="choices"></div>
-      <div id="debugLog" class="debug-log">Log: ...</div>
-      <button id="wheelBtn" class="fate">🎡 Wheel of Fate</button>
-      <button id="backToMenuBtn" class="secondary">⬅ Back to Menu</button>
+      <div class="scene-actions">
+        <button id="wheelBtn" class="fate">🎡 Wheel of Fate</button>
+        <button id="backToMenuBtn" class="btn-ghost">⬅ Back</button>
+      </div>
+      <div id="debugLog" class="debug-log"></div>
     </section>
 
+    <!-- Wheel of Fate -->
     <section id="wheel" class="screen">
-      <h2>Wheel of Fate</h2>
+      <h2>🎡 Wheel of Fate</h2>
       <canvas id="wheelCanvas" width="200" height="200"></canvas>
-      <p id="wheelHint" class="small">Scroll to spin, press Fate to release</p>
-      <button id="releaseBtn">Release Fate</button>
-      <button id="backToMenuFromWheelBtn" class="secondary">⬅ Back to Menu</button>
+      <p id="wheelHint" class="hint">Scroll to spin, press to release</p>
+      <button id="releaseBtn" class="fate">Release Fate</button>
+      <button id="backToMenuFromWheelBtn" class="btn-ghost">⬅ Back</button>
     </section>
 
+    <!-- End Screen -->
     <section id="end" class="screen">
-      <h2 id="endTitle">The End</h2>
-      <p id="endText"></p>
-      <button id="restartBtn">Back to Menu</button>
+      <div class="end-hero">
+        <h2 id="endTitle">The End</h2>
+        <p id="endText"></p>
+        <button id="restartBtn" class="btn-primary">🔄 Play Again</button>
+      </div>
     </section>
   </main>
 
-  <!-- Generic Save/Load Screen Modal -->
+  <!-- Save/Load Modal -->
   <div id="savesModal" class="modal" style="display:none;">
     <div class="modal-content screen">
-      <h3 id="savesTitle" style="margin-top:0; text-align:center;">Select Slot</h3>
-      <div id="saveSlotsContainer">
-        <!-- Slots injected here via JS -->
-      </div>
-      <button id="savesBackBtn" class="secondary" style="margin-top: 10px;">Cancel</button>
+      <h3 id="savesTitle">Select Slot</h3>
+      <div id="saveSlotsContainer"></div>
+      <button id="savesBackBtn" class="btn-ghost" style="margin-top: 10px;">Cancel</button>
     </div>
   </div>
 
@@ -80,14 +102,14 @@
   <div id="saveModal" class="modal" style="display:none;">
     <div class="modal-content screen">
       <h3>Save progress?</h3>
-      <p class="small" style="margin-bottom:12px;">Would you like to save before returning to the menu?</p>
-      <button id="modalSaveBtn">Yes, Save</button>
-      <button id="modalDiscardBtn" class="secondary">No, Discard</button>
-      <button id="modalCancelBtn" class="secondary" style="margin-top:10px;">Cancel</button>
+      <p class="hint" style="margin-bottom:12px;">Save before returning to menu?</p>
+      <button id="modalSaveBtn" class="btn-primary">Yes, Save</button>
+      <button id="modalDiscardBtn" class="btn-secondary">No, Discard</button>
+      <button id="modalCancelBtn" class="btn-ghost" style="margin-top:10px;">Cancel</button>
     </div>
   </div>
 
-  <script type="module" src="./main.js?v=22"></script>
+  <script type="module" src="./main.js?v=23"></script>
 </body>
 
 </html>

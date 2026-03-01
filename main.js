@@ -16,22 +16,19 @@ const state = {
   hp: 10,
   step: 0,
   theme: null,
-  seed: Math.floor(Math.random() * 1e9),
   history: [],
   scene: null,
-  gold: 0,
   bossesDefeated: 0,
 };
 
 let API_URL = localStorage.getItem("sas_api_url") || "https://scroll-and-sword-api.swordandscroll.workers.dev";
-let forcedSeed = localStorage.getItem("sas_forced_seed") || "";
 
 function show(screen) {
   state.currentScreen = screen;
   screens.forEach((s) => $(s).classList.remove("active"));
   $(screen).classList.add("active");
   if ($("hp")) $("hp").textContent = state.hp;
-  if ($("gold")) $("gold").textContent = state.gold;
+  if ($("stepBadge")) $("stepBadge").textContent = `${state.step}/20`;
 
   // Hide stats on menu and meta screens
   const statsEl = document.querySelector(".stats");
