@@ -43,44 +43,64 @@
       };
 
       const models = [
-        env.MODEL_PRIMARY || "google/gemini-2.5-flash:free",
-        env.MODEL_FALLBACK || "meta-llama/llama-3.3-70b-instruct:free"
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "google/gemini-2.0-flash:free",
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "mistralai/mistral-7b-instruct:free",
+        "nousresearch/hermes-3-llama-3.1-8b:free",
+        "google/gemma-2-9b-it:free",
+        "microsoft/phi-3-mini-128k-instruct:free",
+        "qwen/qwen2.5-72b-instruct:free",
+        "openrouter/auto-free"
       ];
 
       let parsed = null;
       let lastErr = null;
+      let usedModel = null;
 
       for (const model of models) {
         try {
-          const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user);
-          let text = raw?.choices?.[0]?.message?.content || "{}";
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
-          // Resilient JSON extraction
+          const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user, controller.signal);
+          clearTimeout(timeoutId);
+
+          let text = raw?.choices?.[0]?.message?.content || "{}";
+          text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
           const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (jsonMatch) text = jsonMatch[0];
 
           const obj = JSON.parse(text);
           if (isValid(obj)) {
             parsed = obj;
+            usedModel = model;
             break;
           }
-          lastErr = `invalid schema: ${JSON.stringify(obj).slice(0, 100)}`;
+          lastErr = `Invalid JSON from ${model}: ${text.slice(0, 50)}`;
         } catch (e) {
-          lastErr = `parse/call error: ${String(e?.message || e)}`;
+          const isTimeout = e.name === "AbortError";
+          lastErr = `${model} ${isTimeout ? "TIMED OUT" : "FAILED"}: ${e.message || e}`;
+          console.log(lastErr);
         }
       }
 
       if (!parsed) {
         return json({
-          error: "AI_FAILURE",
+          error: "AI_EXHAUSTED",
           detail: lastErr,
-          narration: "The Oracle's voice fades into static. Check your connection.",
-          choices: ["Try again", "Reset luck", "Wait...", "Force path"],
-          risk: "mid",
-          tag: "hazard"
-        }, 200);
+          narration: "The Oracle remains silent after ten attempts. The stars are clouded.",
+          choices: ["RETRY ORACLE", "BACK TO MENU", "TRY DIFFERENT PATH", "FORCE AWAKENING"],
+          risk: "high",
+          tag: "hazard",
+          _source: "error"
+        }, 503);
       }
 
+      parsed._model = usedModel;
+      parsed._source = "ai";
       return json(parsed, 200);
     } catch (e) {
       return json({
@@ -94,7 +114,7 @@
   }
 };
 
-async function callOpenRouter(apiKey, model, systemPrompt, userObj) {
+async function callOpenRouter(apiKey, model, systemPrompt, userObj, signal) {
   if (!apiKey) throw new Error("OPENROUTER_API_KEY missing");
   const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -112,7 +132,8 @@ async function callOpenRouter(apiKey, model, systemPrompt, userObj) {
         { role: "system", content: systemPrompt },
         { role: "user", content: JSON.stringify(userObj) }
       ]
-    })
+    }),
+    signal
   });
 
   if (!resp.ok) {
