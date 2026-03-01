@@ -92,6 +92,48 @@ body::after {
   color: var(--text-dim);
 }
 
+/* ═══ Resource Strip ═══ */
+.resource-strip {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.res-item {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #1a1e36;
+  border: 1px solid #ffffff10;
+  color: var(--text-dim);
+  transition: all 0.3s;
+}
+
+.res-warn {
+  color: var(--warn);
+  border-color: #ffd86b22;
+}
+
+.res-crit {
+  color: var(--danger);
+  border-color: #ff5c5c22;
+  animation: res-blink 1.5s infinite;
+}
+
+@keyframes res-blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* ═══ Screens ═══ */
 .screen {
   display: none;
