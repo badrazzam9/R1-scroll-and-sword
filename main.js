@@ -99,6 +99,10 @@ async function nextScene(choiceText = null) {
       $("choices").innerHTML = "";
 
       log("Calling Oracle...");
+      if ($("aiStatus")) {
+        $("aiStatus").textContent = "AI: Connecting...";
+        $("aiStatus").style.color = "#ffd86b";
+      }
       const r = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -182,11 +186,11 @@ function renderScene() {
   if ($("aiStatus")) {
     const src = state.scene._source || "unknown";
     if (src === "ai") {
-      $("aiStatus").textContent = "AI: " + (state.scene._model || "CONNECTED");
-    } else if (src === "fallback") {
-      $("aiStatus").textContent = "AI: OFFLINE (Lore Mode)";
+      $("aiStatus").textContent = "AI: Online";
+      $("aiStatus").style.color = "#7ef07e";
     } else {
-      $("aiStatus").textContent = "AI: ERROR";
+      $("aiStatus").textContent = "AI: Offline";
+      $("aiStatus").style.color = "#ff6b6b";
     }
   }
 
