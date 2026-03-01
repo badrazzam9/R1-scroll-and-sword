@@ -177,6 +177,7 @@ function localScene({ theme, hp, step, isBossStep }) {
 }
 
 function renderScene() {
+  window.scrollTo(0, 0);
   if ($("narration")) $("narration").textContent = state.scene.narration;
   if ($("sceneMeta")) {
     const risk = (state.scene.risk || "mid").toUpperCase();
