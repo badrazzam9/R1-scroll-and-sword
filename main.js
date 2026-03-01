@@ -23,6 +23,16 @@ function show(screen) {
   if ($("hp")) $("hp").textContent = state.hp;
   if ($("act")) $("act").textContent = state.act;
   if ($("gold")) $("gold").textContent = state.gold;
+
+  // Hide stats on menu and meta screens
+  const statsEl = document.querySelector(".stats");
+  if (statsEl) {
+    if (["menu", "theme", "end", "saves"].includes(screen)) {
+      statsEl.style.display = "none";
+    } else {
+      statsEl.style.display = "flex";
+    }
+  }
 }
 
 function save() { localStorage.setItem("sas_save", JSON.stringify(state)); }
@@ -161,14 +171,42 @@ function renderScene() {
 
 function pickChoice(i) {
   const choice = state.scene.choices[i];
+
+  // Gold economy based on choice
+  const costMatch = choice.match(/(?:pay|spend|cost[s]?)[^\d]*(\d+)[^\d]*(?:gold|coin[s]?)/i) || choice.match(/(\d+)\s*gold/i);
+  let choiceCost = 0;
+  if (costMatch && (choice.toLowerCase().includes("pay") || choice.toLowerCase().includes("cost") || choice.toLowerCase().includes("buy") || choice.toLowerCase().includes("gold"))) {
+    choiceCost = parseInt(costMatch[1], 10);
+  }
+
+  if (choiceCost > 0) {
+    if (state.gold >= choiceCost) {
+      state.gold -= choiceCost;
+    } else {
+      alert("Not enough gold for this choice!");
+      return; // prevent choice
+    }
+  } else {
+    // Earn varying random gold otherwise
+    state.gold += Math.floor(seeded(9) * 5);
+  }
+
   state.history[state.history.length - 1].picked = choice;
 
+  // HP logic
   const risk = ((state.step + i + (state.seed % 7)) % 10) + (state.scene.risk === "high" ? 2 : 0);
-  if (risk > 8) state.hp -= 3;
-  else if (risk > 5) state.hp -= 1;
-  else if (risk < 2 && state.hp < 10) state.hp += 1;
+  let hpLoss = 0;
 
-  state.gold += 1 + Math.floor(seeded(9) * 4);
+  const narrLower = state.scene.narration.toLowerCase();
+  if (narrLower.includes("attack") || narrLower.includes("harm") || narrLower.includes("strike") || narrLower.includes("wound") || narrLower.includes("blood")) {
+    hpLoss += 1;
+  }
+
+  if (risk > 8) hpLoss += 3;
+  else if (risk > 5) hpLoss += 1;
+
+  if (hpLoss === 0 && risk < 2 && state.hp < 10) state.hp += 1; // minor heal
+  else state.hp -= hpLoss;
   if (seeded(10) > 0.7 && state.inventory.length < 6) {
     const loot = ["Lucky Coin", "Medkit", "Rune Shard", "Smoke Capsule"][Math.floor(seeded(11) * 4)];
     state.inventory.push(loot);
@@ -314,15 +352,16 @@ $("releaseBtn")?.addEventListener("click", () => {
 });
 window.addEventListener("wheel", (e) => {
   if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity += Math.max(-0.02, Math.min(0.02, -e.deltaY / 1200));
+    e.preventDefault();
+    wheel.velocity += (e.deltaY > 0 ? 0.05 : -0.05);
     drawWheel();
   } else if ($("scene")?.classList.contains("active")) {
     const narr = $("narration");
-    if (narr) narr.scrollTop += (e.deltaY > 0 ? 20 : -20);
+    if (narr) narr.scrollTop += (e.deltaY > 0 ? 50 : -50);
   } else {
-    window.scrollBy(0, e.deltaY > 0 ? 30 : -30);
+    window.scrollBy(0, e.deltaY > 0 ? 50 : -50);
   }
-});
+}, { passive: false });
 
 // Polyfill Rabbit R1 Scroll Wheel (mapped to Arrow keys)
 window.addEventListener("keydown", (e) => {
@@ -331,15 +370,15 @@ window.addEventListener("keydown", (e) => {
 
     if ($("wheel")?.classList.contains("active")) {
       e.preventDefault();
-      wheel.velocity += isDown ? 0.05 : -0.05;
+      wheel.velocity += isDown ? 0.08 : -0.08;
       drawWheel();
     } else if ($("scene")?.classList.contains("active")) {
       e.preventDefault();
       const narr = $("narration");
-      if (narr) narr.scrollTop += isDown ? 30 : -30;
+      if (narr) narr.scrollTop += isDown ? 50 : -50;
     } else {
       // For menu screens let native scrolling handle it, or force body scroll
-      window.scrollBy(0, isDown ? 30 : -30);
+      window.scrollBy(0, isDown ? 50 : -50);
     }
   }
 });
