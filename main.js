@@ -348,11 +348,8 @@ window.addEventListener("wheel", (e) => {
 // Polyfill Rabbit R1 Scroll Wheel (mapped to SDK commands)
 window.addEventListener("scrollUp", (e) => {
   if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity += 0.08;
+    wheel.velocity -= 0.08;
     drawWheel();
-  } else if ($("scene")?.classList.contains("active")) {
-    const narr = $("narration");
-    if (narr) narr.scrollTop -= 50;
   } else {
     window.scrollBy(0, -50);
   }
@@ -360,11 +357,8 @@ window.addEventListener("scrollUp", (e) => {
 
 window.addEventListener("scrollDown", (e) => {
   if ($("wheel")?.classList.contains("active")) {
-    wheel.velocity -= 0.08;
+    wheel.velocity += 0.08;
     drawWheel();
-  } else if ($("scene")?.classList.contains("active")) {
-    const narr = $("narration");
-    if (narr) narr.scrollTop += 50;
   } else {
     window.scrollBy(0, 50);
   }

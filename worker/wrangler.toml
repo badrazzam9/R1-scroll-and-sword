@@ -3,5 +3,5 @@ main = "index.js"
 compatibility_date = "2026-02-28"
 
 [vars]
-MODEL_PRIMARY = "google/gemini-2.5-flash:free"
-MODEL_FALLBACK = "meta-llama/llama-3.3-70b-instruct:free"
+MODEL_PRIMARY = "google/gemini-2.0-flash:free"
+MODEL_FALLBACK = "google/gemini-2.0-flash-lite-preview-02-05:free"

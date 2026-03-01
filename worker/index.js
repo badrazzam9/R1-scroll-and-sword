@@ -16,13 +16,12 @@
       }
 
       const sys = [
-        "You are the narrator for a compact pixel RPG called Scroll and Sword.",
-        "Return STRICT JSON only.",
-        "Keep narration 1-3 sentences, gritty, vivid, actionable.",
-        "Provide exactly 4 choices, each 3-8 words.",
-        "Set risk one of: low|mid|high.",
-        "Set tag one of: combat|exploration|social|hazard|boss.",
-        "No markdown. No extra keys."
+        "You are the narrator for a pixel RPG called Scroll and Sword.",
+        "MANDATORY: Return ONLY a raw JSON object. No markdown blocks. No extra text.",
+        "Narration: 1-3 gritty, actionable sentences.",
+        "Choices: Exactly 4 separate options, 3-8 words each.",
+        "Risk: 'low'|'mid'|'high'.",
+        "Tag: 'combat'|'exploration'|'social'|'hazard'|'boss'.",
       ].join(" ");
 
       const schemaHint = {
@@ -54,31 +53,32 @@
       for (const model of models) {
         try {
           const raw = await callOpenRouter(env.OPENROUTER_API_KEY, model, sys, user);
-          const text = raw?.choices?.[0]?.message?.content || "{}";
+          let text = raw?.choices?.[0]?.message?.content || "{}";
+
+          // Resilient JSON extraction
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) text = jsonMatch[0];
+
           const obj = JSON.parse(text);
           if (isValid(obj)) {
             parsed = obj;
             break;
           }
-          lastErr = "invalid schema";
+          lastErr = `invalid schema: ${JSON.stringify(obj).slice(0, 100)}`;
         } catch (e) {
-          lastErr = String(e?.message || e);
+          lastErr = `parse/call error: ${String(e?.message || e)}`;
         }
       }
 
       if (!parsed) {
-        // fail-safe scene
-        parsed = {
-          narration: "Static crackles through the dark corridor as your next move decides everything.",
-          choices: [
-            "Advance with caution",
-            "Set an ambush",
-            "Attempt negotiation",
-            "Retreat to recover"
-          ],
+        return json({
+          error: "AI_FAILURE",
+          detail: lastErr,
+          narration: "The Oracle's voice fades into static. Check your connection.",
+          choices: ["Try again", "Reset luck", "Wait...", "Force path"],
           risk: "mid",
-          tag: "exploration"
-        };
+          tag: "hazard"
+        }, 200);
       }
 
       return json(parsed, 200);
@@ -108,7 +108,6 @@ async function callOpenRouter(apiKey, model, systemPrompt, userObj) {
       model,
       temperature: 0.9,
       max_tokens: 220,
-      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: JSON.stringify(userObj) }
