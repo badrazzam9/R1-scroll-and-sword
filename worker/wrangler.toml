@@ -1,7 +1,0 @@
-name = "scroll-and-sword-api"
-main = "index.js"
-compatibility_date = "2026-02-28"
-
-[vars]
-MODEL_PRIMARY = "openai/gpt-4o-mini"
-MODEL_FALLBACK = "meta-llama/llama-3.1-8b-instruct"
