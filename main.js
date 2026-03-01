@@ -194,9 +194,9 @@ function drawWheel() {
   if (!ctx) return;
   const choices = state.scene?.choices || [];
   const n = Math.max(choices.length, 1);
-  const r = 120;
-  const cw = 260; // canvas width
-  const ch = 260; // canvas height
+  const r = 85;
+  const cw = 200; // canvas width
+  const ch = 200; // canvas height
   const cx = cw / 2; // center X
   const cy = ch / 2; // center Y
 
@@ -272,11 +272,11 @@ function drawWheel() {
 
   // Pointer/Arrow (at the top)
   ctx.save();
-  ctx.translate(cx, 16);
+  ctx.translate(cx, 10);
   ctx.beginPath();
-  ctx.moveTo(0, 15);
-  ctx.lineTo(-12, -8);
-  ctx.lineTo(12, -8);
+  ctx.moveTo(0, 12);
+  ctx.lineTo(-10, -6);
+  ctx.lineTo(10, -6);
   ctx.closePath();
   ctx.fillStyle = "#ffc107";
   ctx.shadowColor = "rgba(0,0,0,0.8)";
@@ -313,9 +313,35 @@ $("releaseBtn")?.addEventListener("click", () => {
   animateWheel();
 });
 window.addEventListener("wheel", (e) => {
-  if (!$("wheel")?.classList.contains("active")) return;
-  wheel.velocity += Math.max(-0.02, Math.min(0.02, -e.deltaY / 1200));
-  drawWheel();
+  if ($("wheel")?.classList.contains("active")) {
+    wheel.velocity += Math.max(-0.02, Math.min(0.02, -e.deltaY / 1200));
+    drawWheel();
+  } else if ($("scene")?.classList.contains("active")) {
+    const narr = $("narration");
+    if (narr) narr.scrollTop += (e.deltaY > 0 ? 20 : -20);
+  } else {
+    window.scrollBy(0, e.deltaY > 0 ? 30 : -30);
+  }
+});
+
+// Polyfill Rabbit R1 Scroll Wheel (mapped to Arrow keys)
+window.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+    const isDown = e.key === "ArrowDown";
+
+    if ($("wheel")?.classList.contains("active")) {
+      e.preventDefault();
+      wheel.velocity += isDown ? 0.05 : -0.05;
+      drawWheel();
+    } else if ($("scene")?.classList.contains("active")) {
+      e.preventDefault();
+      const narr = $("narration");
+      if (narr) narr.scrollTop += isDown ? 30 : -30;
+    } else {
+      // For menu screens let native scrolling handle it, or force body scroll
+      window.scrollBy(0, isDown ? 30 : -30);
+    }
+  }
 });
 
 // Menu bindings

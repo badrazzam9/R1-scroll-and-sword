@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Scroll & Sword</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=2" />
 </head>
 
 <body>
@@ -22,17 +22,11 @@
     <section id="menu" class="screen active">
       <h2>Menu</h2>
       <button data-action="new">New Game</button>
-      <button data-action="resume">Resume</button>
+      <button data-action="load">Load Game</button>
 
       <div class="settings">
         <input id="seedInput" type="number" placeholder="Optional seed (e.g. 12345)" />
         <button id="saveSettingsBtn">Save Settings</button>
-      </div>
-
-      <div class="save-tools">
-        <button id="copySaveBtn" class="secondary">Copy Save Code</button>
-        <input id="importSaveInput" type="text" placeholder="Paste save code" />
-        <button id="importSaveBtn" class="secondary">Import Save Code</button>
       </div>
 
       <p class="small">Scroll to move • Press to select</p>
@@ -57,7 +51,7 @@
 
     <section id="wheel" class="screen">
       <h2>Wheel of Fate</h2>
-      <canvas id="wheelCanvas" width="260" height="260"></canvas>
+      <canvas id="wheelCanvas" width="200" height="200"></canvas>
       <p id="wheelHint" class="small">Scroll to spin, press Fate to release</p>
       <button id="releaseBtn">Release Fate</button>
       <button id="backToMenuFromWheelBtn" class="secondary">⬅ Back to Menu</button>
@@ -68,9 +62,29 @@
       <p id="endText"></p>
       <button id="restartBtn">Back to Menu</button>
     </section>
+
+    <!-- Generic Save/Load Screen -->
+    <section id="saves" class="screen">
+      <h2 id="savesTitle">Select Slot</h2>
+      <div id="saveSlotsContainer">
+        <!-- Slots injected here via JS -->
+      </div>
+      <button id="savesBackBtn" class="secondary" style="margin-top: 10px;">Back</button>
+    </section>
   </main>
 
-  <script type="module" src="./main.js"></script>
+  <!-- Save Confirmation Modal -->
+  <div id="saveModal" class="modal" style="display:none;">
+    <div class="modal-content screen">
+      <h3>Save progress?</h3>
+      <p class="small" style="margin-bottom:12px;">Would you like to save before returning to the menu?</p>
+      <button id="modalSaveBtn">Yes, Save</button>
+      <button id="modalDiscardBtn" class="secondary">No, Discard</button>
+      <button id="modalCancelBtn" class="secondary" style="margin-top:10px;">Cancel</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js?v=2"></script>
 </body>
 
 </html>
