@@ -61,8 +61,6 @@ function newGame(theme) {
     theme,
     history: [],
     scene: null,
-    seed: forcedSeed ? Number(forcedSeed) : Math.floor(Math.random() * 1e9),
-    gold: 0,
     bossesDefeated: 0,
   });
   nextScene();
@@ -545,24 +543,4 @@ function applyThemeClass() {
   if (state.theme) document.body.classList.add(`theme-${state.theme}`);
 }
 
-function initMenuSettings() {
-  const seedInput = $("seedInput");
-  if (!seedInput) return;
-
-  seedInput.value = forcedSeed;
-
-  $("saveSettingsBtn")?.addEventListener("click", () => {
-    // Endpoint is locked globally for all users
-    API_URL = "https://scroll-and-sword-api.swordandscroll.workers.dev";
-    localStorage.setItem("sas_api_url", API_URL);
-
-    forcedSeed = seedInput.value.trim();
-    if (forcedSeed) localStorage.setItem("sas_forced_seed", forcedSeed);
-    else localStorage.removeItem("sas_forced_seed");
-
-    alert("Settings saved");
-  });
-}
-
-initMenuSettings();
 show("menu");
