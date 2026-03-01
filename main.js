@@ -74,6 +74,9 @@ async function nextScene(choiceText = null) {
   // AI-first
   if (API_URL) {
     try {
+      show("scene");
+      $("narration").innerHTML = '<span class="loading">The Oracle is weaving your fate...</span>';
+      $("choices").innerHTML = "";
       const r = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -86,7 +89,7 @@ async function nextScene(choiceText = null) {
           sceneSource = "ai";
         }
       }
-    } catch {}
+    } catch { }
   }
 
   // fallback
@@ -192,19 +195,98 @@ function drawWheel() {
   const choices = state.scene?.choices || [];
   const n = Math.max(choices.length, 1);
   const r = 120;
-  ctx.clearRect(0, 0, 260, 260);
+  const cw = 260; // canvas width
+  const ch = 260; // canvas height
+  const cx = cw / 2; // center X
+  const cy = ch / 2; // center Y
+
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.save();
+
+  // Outer glowing rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+  ctx.fillStyle = "#2c1e4a";
+  ctx.shadowColor = "#6e3f94";
+  ctx.shadowBlur = 15;
+  ctx.fill();
+  ctx.shadowBlur = 0; // reset shadow
+
+  // Draw segments
   for (let i = 0; i < n; i++) {
     const a0 = wheel.angle + (i * 2 * Math.PI) / n;
     const a1 = wheel.angle + ((i + 1) * 2 * Math.PI) / n;
+
     ctx.beginPath();
-    ctx.moveTo(130, 130);
-    ctx.arc(130, 130, r, a0, a1);
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, a0, a1);
     ctx.closePath();
-    ctx.fillStyle = i % 2 ? "#4a2f7a" : "#2f4f7a";
+
+    // Gradient for segments
+    const grad = ctx.createRadialGradient(cx, cy, 20, cx, cy, r);
+    if (i % 2 === 0) {
+      grad.addColorStop(0, "#4a2f7a");
+      grad.addColorStop(1, "#2a1554");
+    } else {
+      grad.addColorStop(0, "#2f4f7a");
+      grad.addColorStop(1, "#182c47");
+    }
+
+    ctx.fillStyle = grad;
     ctx.fill();
+    ctx.strokeStyle = "#1b1d34";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw choice numbers
+    ctx.save();
+    const midAngle = a0 + (a1 - a0) / 2;
+    // position text mostly towards outer edge
+    const tx = cx + Math.cos(midAngle) * (r * 0.7);
+    const ty = cy + Math.sin(midAngle) * (r * 0.7);
+    ctx.translate(tx, ty);
+    ctx.rotate(midAngle + Math.PI / 2);
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = "bold 20px 'VT323', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "#000";
+    ctx.shadowBlur = 4;
+    ctx.fillText(`${i + 1}`, 0, 0);
+    ctx.restore();
   }
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(126, 4, 8, 20);
+
+  // Center Hub
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  const hubGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 18);
+  hubGrad.addColorStop(0, "#dce7ff");
+  hubGrad.addColorStop(1, "#30427a");
+  ctx.fillStyle = hubGrad;
+  ctx.fill();
+  ctx.strokeStyle = "#121323";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Pointer/Arrow (at the top)
+  ctx.save();
+  ctx.translate(cx, 16);
+  ctx.beginPath();
+  ctx.moveTo(0, 15);
+  ctx.lineTo(-12, -8);
+  ctx.lineTo(12, -8);
+  ctx.closePath();
+  ctx.fillStyle = "#ffc107";
+  ctx.shadowColor = "rgba(0,0,0,0.8)";
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+  ctx.fill();
+  ctx.strokeStyle = "#b38600";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function animateWheel() {
