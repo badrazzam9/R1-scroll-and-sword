@@ -345,15 +345,28 @@ window.addEventListener("wheel", (e) => {
   }
 }, { passive: false });
 
-// Polyfill Rabbit R1 Scroll Wheel (mapped to Arrow keys)
-window.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-    if ($("wheel")?.classList.contains("active")) {
-      e.preventDefault();
-      wheel.velocity += (e.key === "ArrowDown") ? 0.08 : -0.08;
-      drawWheel();
-    }
-    // Let default behavior handle document scrolling natively for the rest of the app!
+// Polyfill Rabbit R1 Scroll Wheel (mapped to SDK commands)
+window.addEventListener("scrollUp", (e) => {
+  if ($("wheel")?.classList.contains("active")) {
+    wheel.velocity += 0.08;
+    drawWheel();
+  } else if ($("scene")?.classList.contains("active")) {
+    const narr = $("narration");
+    if (narr) narr.scrollTop -= 50;
+  } else {
+    window.scrollBy(0, -50);
+  }
+});
+
+window.addEventListener("scrollDown", (e) => {
+  if ($("wheel")?.classList.contains("active")) {
+    wheel.velocity -= 0.08;
+    drawWheel();
+  } else if ($("scene")?.classList.contains("active")) {
+    const narr = $("narration");
+    if (narr) narr.scrollTop += 50;
+  } else {
+    window.scrollBy(0, 50);
   }
 });
 
