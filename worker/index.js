@@ -182,7 +182,7 @@ RefineHint:${input.refineNarration || 'none'}
 History:${JSON.stringify(input.history || [])}`;
 
     const body = {
-      model: env.MODEL || 'openai/gpt-4o-mini',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: sys },
         ...examples,
@@ -193,10 +193,10 @@ History:${JSON.stringify(input.history || [])}`;
     };
 
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${env.OPENROUTER_API_KEY || env.GROQ_API_KEY || ''}`,
+          'Authorization': `Bearer ${env.GROQ_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
