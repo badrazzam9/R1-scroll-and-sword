@@ -213,6 +213,9 @@ History:${JSON.stringify(input.history || [])}`;
       if (!looksUsableScene(parsed, input)) {
         console.log('scene_rejected', JSON.stringify({ step: input.step, theme: input.theme, reason: 'quality_or_continuity' }));
         parsed = fallbackScene(input);
+        parsed._source = 'offline';
+      } else {
+        parsed._source = 'ai';
       }
 
       return Response.json(parsed, {
@@ -225,6 +228,7 @@ History:${JSON.stringify(input.history || [])}`;
     } catch (e) {
       const fb = fallbackScene(input);
       fb._error = String(e?.message || e);
+      fb._source = 'offline';
       return Response.json(fb, {
         headers: {
           'Access-Control-Allow-Origin': '*',
