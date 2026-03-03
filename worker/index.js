@@ -192,32 +192,46 @@ History:${JSON.stringify(input.history || [])}`;
       response_format: { type: 'json_object' }
     };
 
-      return json({ error: "unknown action" }, 400);
-    } catch (e) {
-      return json({ narration: "The path is unclear. Try again.", choices: ["Try again", "Back to menu", "Wait", "Restart"], risk: "low", tag: "exploration", _source: "offline", _error: String(e?.message || e) }, 200);
-    }
-  }
-};
-
-    const data = await r.json();
-    let parsed;
     try {
-      parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
-    } catch {
-      parsed = {};
-    }
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${env.OPENROUTER_API_KEY || env.GROQ_API_KEY || ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
 
-    if (!looksUsableScene(parsed, input)) {
-      console.log('scene_rejected', JSON.stringify({ step: input.step, theme: input.theme, reason: 'quality_or_continuity' }));
-      parsed = fallbackScene(input);
-    }
-
-    return Response.json(parsed, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+      const data = await r.json();
+      let parsed;
+      try {
+        parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+      } catch {
+        parsed = {};
       }
-    });
+
+      if (!looksUsableScene(parsed, input)) {
+        console.log('scene_rejected', JSON.stringify({ step: input.step, theme: input.theme, reason: 'quality_or_continuity' }));
+        parsed = fallbackScene(input);
+      }
+
+      return Response.json(parsed, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        }
+      });
+    } catch (e) {
+      const fb = fallbackScene(input);
+      fb._error = String(e?.message || e);
+      return Response.json(fb, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        }
+      });
+    }
   }
 };
