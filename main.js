@@ -9,7 +9,8 @@ const DEFAULT_STATE = {
   bossesDefeated: 0, campaignSeed: null,
   flags: [], npcs: [], resources: {},
   promises: [], threats: [], clues: [],
-  identity: {}, endingTags: []
+  identity: {}, endingTags: [],
+  plotBeats: [], storySoFar: "", previousHook: null
 };
 const state = { ...DEFAULT_STATE };
 
@@ -93,6 +94,10 @@ async function newGame(theme) {
       if (seed && seed.worldTruth) {
         state.campaignSeed = seed;
         state.resources = seed.resources || getDefaultResources(theme);
+        // Store plot outline for Act Director
+        if (Array.isArray(seed.plotBeats)) {
+          state.plotBeats = seed.plotBeats;
+        }
         // Initialize NPC tracking from seed
         if (seed.npcs) {
           state.npcs = seed.npcs.map(n => ({ ...n, trust: 5, status: "active", lastSeen: 0 }));
@@ -125,15 +130,21 @@ async function nextScene(choiceText = null) {
   $("choices").innerHTML = "";
   if ($("aiStatus")) { $("aiStatus").textContent = "AI: Connecting..."; $("aiStatus").style.color = "#ffd86b"; }
 
+  // Get the current beat from the plot outline (0-indexed, step is 1-indexed)
+  const currentBeat = state.plotBeats && state.plotBeats[state.step - 1] || null;
+
   const prompt = {
     action: "narrate", theme: state.theme, hp: state.hp, step: state.step,
     previousChoice: choiceText,
-    history: state.history.slice(-4),
+    history: state.history.slice(-6),
     campaignSeed: state.campaignSeed,
     flags: state.flags,
     npcs: state.npcs,
     resources: state.resources,
-    identity: state.identity
+    identity: state.identity,
+    storySoFar: state.storySoFar || "",
+    previousHook: state.previousHook || null,
+    currentBeat: currentBeat
   };
 
   let scene = null;
@@ -165,6 +176,18 @@ async function nextScene(choiceText = null) {
 
   state.scene = scene;
   state.history.push({ scene: scene.narration, picked: null });
+
+  // Update running summary (compressed story-so-far)
+  const choiceSummary = choiceText ? ` Chose: ${choiceText}.` : "";
+  const sceneSummary = scene.narration.length > 80 ? scene.narration.substring(0, 80) + "..." : scene.narration;
+  const newEntry = `[${state.step}]${choiceSummary} ${sceneSummary}`;
+  state.storySoFar = state.storySoFar
+    ? (state.storySoFar + " | " + newEntry).slice(-600)
+    : newEntry;
+
+  // Track the hook for scene anchoring
+  state.previousHook = scene.hook || scene.narration.split(/[.!?]+/).filter(s => s.trim()).pop() || scene.narration;
+
   renderScene();
   save();
 }

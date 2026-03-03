@@ -1,7 +1,7 @@
 ﻿export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors() });
-    if (request.method !== "POST") return json({ ok: true, service: "scroll-and-sword-api", version: "v24" });
+    if (request.method !== "POST") return json({ ok: true, service: "scroll-and-sword-api", version: "v25" });
 
     try {
       const body = await request.json();
@@ -55,6 +55,21 @@ async function handleSeedGeneration(body, env) {
   ], 600);
 
   if (result) {
+    // Generate 20-beat plot outline using the seed
+    const plotResult = await callAI(env, [
+      { role: "system", content: "You are a plot architect. Given a campaign seed, generate a tight 20-beat plot outline. Each beat is ONE sentence describing what happens at that step. Return ONLY a JSON object: {\"plotBeats\": [\"beat1\", \"beat2\", ...]}. Follow this arc: beats 1-3 introduce the world and hint at conflict, beats 4-5 first real consequence, beats 6-8 complications mount, beats 9-10 midpoint twist, beats 11-13 escalation and betrayal, beats 14-16 moral identity crisis, beats 17-19 everything converges, beat 20 finale. Each beat MUST reference specific NPCs, factions, or the symbol from the seed. No vague beats." },
+      { role: "user", content: `Campaign seed: ${JSON.stringify(result)}` }
+    ], 800);
+
+    if (plotResult && Array.isArray(plotResult.plotBeats) && plotResult.plotBeats.length >= 15) {
+      // Pad to 20 if AI returned fewer
+      while (plotResult.plotBeats.length < 20) plotResult.plotBeats.push("The story reaches its natural conclusion.");
+      result.plotBeats = plotResult.plotBeats.slice(0, 20);
+    } else {
+      // Generate basic beats from seed structure
+      result.plotBeats = generateFallbackBeats(result);
+    }
+
     result._source = "ai";
     return json(result);
   }
@@ -64,10 +79,10 @@ async function handleSeedGeneration(body, env) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// NARRATION — Campaign-aware scene generation
+// NARRATION — Plot-tight scene generation with Act Director
 // ═══════════════════════════════════════════════════════════
 async function handleNarration(body, env) {
-  const { theme, hp, step, previousChoice, history, campaignSeed, flags, npcs, resources, identity } = body;
+  const { theme, hp, step, previousChoice, history, campaignSeed, flags, npcs, resources, identity, storySoFar, previousHook, currentBeat } = body;
   const t = theme || "medieval";
   const s = step || 1;
   const h = hp || 10;
@@ -83,27 +98,53 @@ async function handleNarration(body, env) {
   else if (s <= 19) phase = "CONVERGENCE: Everything converges. Unresolved threats arrive. Past flags matter. The lateReveal surfaces.";
   else phase = "FINALE: Step 20. This is the ending. Wrap up based on identity, flags, and NPC relationships. Make it land.";
 
+  // Scene anchoring: what must this scene resolve and set up?
+  const anchorBlock = previousHook
+    ? `SCENE ANCHOR: The previous scene ended with: "${previousHook}". You MUST open this scene by directly resolving or reacting to that moment. Do NOT ignore it.`
+    : "SCENE ANCHOR: This is the opening scene. Establish the world and end on an intriguing hook.";
+
+  // Act Director: what should happen this scene
+  const beatDirective = currentBeat
+    ? `PLOT BEAT FOR THIS STEP: "${currentBeat}". Your scene MUST advance this plot point. Do not deviate to unrelated events.`
+    : "";
+
+  // Story context: compressed summary of everything so far
+  const storyContext = storySoFar
+    ? `STORY SO FAR: ${storySoFar}`
+    : "";
+
   const sys = [
     "You are the campaign narrator for 'Scroll and Sword', a dark 20-step RPG.",
     "You have a CAMPAIGN SEED that defines this run's world. OBEY IT.",
-    "RULES:",
-    "1. CAUSE AND EFFECT: Show the DIRECT result of the player's last choice. Never ignore it.",
-    "2. BREVITY: Max 2 sentences for normal scenes. 3 for reveals/betrayals/endings.",
-    "3. USE THE SEED: Reference recurring NPCs by name. Echo the recurring symbol. Honor factions, the worldLie, the forbiddenAct.",
-    "4. REAL CHOICES: 4 options (3-6 words each). One direct, one subtle, one cautious, one costly. Each leads somewhere different.",
-    "5. NO RANDOM EVENTS: Everything connects to established lore. Reuse NPCs instead of inventing new ones.",
-    "6. CONSEQUENCES: Include stateUpdates in your response to track what changed.",
-    "7. CALLBACKS: Every 3-4 scenes, briefly reference an earlier choice, wound, promise, or clue.",
-    `8. CURRENT PHASE: ${phase}`,
+    "",
+    anchorBlock,
+    beatDirective,
+    storyContext,
+    "",
+    "STRICT RULES:",
+    "1. CAUSE AND EFFECT: If the player made a choice, show its DIRECT consequence in the FIRST sentence. Never ignore it.",
+    "2. SCENE STRUCTURE: Open by resolving the previous hook → advance the plot beat → end on a NEW hook/cliffhanger that demands resolution next scene.",
+    "3. BREVITY: Max 2 sentences for normal scenes. 3 for reveals/betrayals/endings.",
+    "4. USE THE SEED: Reference recurring NPCs by NAME. Echo the recurring symbol. Honor factions, the worldLie, the forbiddenAct.",
+    "5. REAL CHOICES: 4 options (3-6 words each). Each must be a SPECIFIC action tied to the current scene — not generic. One bold, one cunning, one cautious, one costly.",
+    "6. NO RANDOM EVENTS: Everything connects to the seed, flags, or prior choices. Reuse existing NPCs — do NOT invent new characters.",
+    "7. CONSEQUENCES: Include stateUpdates to track what changed.",
+    "8. CALLBACKS: Every 3-4 scenes, briefly reference an earlier choice, wound, promise, or clue from the storySoFar.",
+    `9. CURRENT PHASE: ${phase}`,
+    "",
     "Return ONLY JSON with these keys:",
-    "narration (string), choices (array of 4 strings), risk (low|mid|high), tag (combat|exploration|social|hazard|boss),",
+    "narration (string — the scene text),",
+    "hook (string — the last sentence/cliffhanger that the NEXT scene must resolve; this is the thread connecting scenes),",
+    "choices (array of 4 strings — specific actions, not generic),",
+    "risk (low|mid|high),",
+    "tag (combat|exploration|social|hazard|boss),",
     "stateUpdates (object with optional keys: hpDelta (number), flagsAdd (array of strings), resourceChanges (object with key:delta pairs), npcUpdates (array of {name, status, trust_delta}), clueAdd (string or null), threatAdd (string or null), identityShift (object with single key like 'ruthless':1 or 'merciful':1))"
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 
   const userPayload = {
     theme: t, hp: h, step: s,
     previousChoice: previousChoice || null,
-    history: Array.isArray(history) ? history.slice(-4) : [],
+    history: Array.isArray(history) ? history.slice(-6) : [],
     campaignSeed: campaignSeed || null,
     currentFlags: flags || [],
     npcStates: npcs || [],
@@ -116,7 +157,7 @@ async function handleNarration(body, env) {
     { role: "user", content: JSON.stringify(userPayload) }
   ];
 
-  const result = await callAI(env, messages, 400);
+  const result = await callAI(env, messages, 500);
 
   if (result && result.narration) {
     // Normalize
@@ -127,6 +168,11 @@ async function handleNarration(body, env) {
     if (result.choices.length > 4) result.choices = result.choices.slice(0, 4);
     result.risk = ({ low: "low", mid: "mid", medium: "mid", high: "high", danger: "high" })[String(result.risk).toLowerCase()] || "mid";
     if (!["combat", "exploration", "social", "hazard", "boss"].includes(result.tag)) result.tag = "exploration";
+    // Ensure hook exists — fallback to last sentence of narration
+    if (!result.hook) {
+      const sentences = result.narration.split(/[.!?]+/).filter(s => s.trim());
+      result.hook = sentences.length > 0 ? sentences[sentences.length - 1].trim() : result.narration;
+    }
     result._source = "ai";
     return json(result);
   }
@@ -134,7 +180,8 @@ async function handleNarration(body, env) {
   return json({
     narration: "The Oracle is resting. Try again in a moment.",
     choices: ["Try again", "Back to menu", "Wait", "Restart"],
-    risk: "low", tag: "exploration", _source: "offline", _error: "AI failed"
+    risk: "low", tag: "exploration", _source: "offline", _error: "AI failed",
+    hook: "The silence stretches on."
   });
 }
 
@@ -221,6 +268,43 @@ async function callAI(env, messages, maxTokens) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// FALLBACK PLOT BEATS — generates basic beats from any seed
+// ═══════════════════════════════════════════════════════════
+function generateFallbackBeats(seed) {
+  const npc0 = seed.npcs?.[0]?.name || "a stranger";
+  const npc1 = seed.npcs?.[1]?.name || "an ally";
+  const npc2 = seed.npcs?.[2]?.name || "a shadow";
+  const fac0 = seed.factions?.[0]?.name || "the ruling power";
+  const sym = seed.recurringSymbol || "a strange mark";
+  const conflict = seed.centralConflict || "a growing crisis";
+  const lie = seed.worldLie || "the accepted truth";
+  const reveal = seed.lateReveal || "everything was a lie";
+  const forbidden = seed.forbiddenAct || "the unthinkable";
+  return [
+    `You arrive in an unfamiliar place. ${sym} catches your eye.`,
+    `${npc0} approaches with a warning and a request.`,
+    `Rumors of ${conflict} spread. ${fac0} tightens its grip.`,
+    `A choice you made draws attention. ${npc1} offers help — for a price.`,
+    `Something goes wrong. Your first real loss. ${sym} reappears.`,
+    `${npc0} reveals their true agenda. Trust fractures.`,
+    `Resources run thin. ${fac0} makes a move. You must pick a side.`,
+    `${npc2} appears with information that changes everything.`,
+    `A discovery challenges ${lie}. The world feels different.`,
+    `Midpoint twist: a false victory or a devastating reversal.`,
+    `${npc1} turns hostile or desperate. Past promises are tested.`,
+    `Betrayal. Someone you trusted acts against you.`,
+    `The cost of your choices becomes visible. ${sym} haunts you.`,
+    `${forbidden} becomes tempting. A moral line appears.`,
+    `${npc0} confronts you about who you've become.`,
+    `A critical choice defines your identity. No going back.`,
+    `${reveal}. Everything reframes.`,
+    `All unresolved threats converge. Allies and enemies collide.`,
+    `The final approach. One last chance to change course.`,
+    `The finale. Everything you've done leads here.`
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════
 // FALLBACK SEEDS
 // ═══════════════════════════════════════════════════════════
 function getFallbackSeed(theme) {
@@ -286,7 +370,9 @@ function getFallbackSeed(theme) {
       resources: { oxygen: 5, integrity: 5, morale: 5 }
     }
   };
-  return { ...seeds[theme] || seeds.medieval, _source: "fallback" };
+  const seed = { ...seeds[theme] || seeds.medieval, _source: "fallback" };
+  seed.plotBeats = generateFallbackBeats(seed);
+  return seed;
 }
 
 function extractJSON(text) {
