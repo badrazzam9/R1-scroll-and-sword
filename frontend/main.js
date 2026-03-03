@@ -1,5 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const screens = ["menu", "theme", "scene", "wheel", "end"];
+const TOTAL_STEPS = 8;
+const ACT_LENGTH = 3;
+const TOTAL_BOSS_STEPS = Math.floor(TOTAL_STEPS / ACT_LENGTH);
 
 const state = {
   hp: 10,
@@ -12,6 +15,7 @@ const state = {
   gold: 0,
   inventory: [],
   bossesDefeated: 0,
+  storyContext: null,
 };
 
 let API_URL = localStorage.getItem("sas_api_url") || "";
@@ -42,6 +46,15 @@ const themeTables = {
 };
 
 const lootPool = ["Iron Charm", "Medkit", "Lucky Coin", "Nano Patch", "Smoke Capsule", "Rune Shard"];
+
+function initialStoryContext(theme) {
+  return {
+    objective: `Survive this short run in the ${theme} realm`,
+    threat: "an unknown force closing in",
+    location: "the frontier",
+    continuity: "You just began your run.",
+  };
+}
 
 function show(screen) {
   screens.forEach((s) => $(s).classList.remove("active"));
@@ -82,6 +95,7 @@ function newGame(theme) {
     gold: 0,
     inventory: [],
     bossesDefeated: 0,
+    storyContext: initialStoryContext(theme),
   });
   applyThemeClass();
   nextScene();
@@ -89,10 +103,10 @@ function newGame(theme) {
 
 async function nextScene(choiceText = null) {
   state.step += 1;
-  state.act = Math.min(3, Math.ceil(state.step / 4));
+  state.act = Math.min(3, Math.ceil(state.step / ACT_LENGTH));
 
-  // Boss chapter scene every 4th step
-  const isBossStep = state.step % 4 === 0;
+  // Boss chapter scene every ACT_LENGTH steps
+  const isBossStep = state.step % ACT_LENGTH === 0;
 
   const prompt = {
     theme: state.theme,
@@ -102,20 +116,111 @@ async function nextScene(choiceText = null) {
     previousChoice: choiceText,
     history: state.history.slice(-6),
     isBossStep,
+    storyContext: state.storyContext,
   };
+
+  const fallbackScene = localScene(prompt);
 
   let scene;
   try {
-    scene = API_URL ? await fetchScene(prompt) : localScene(prompt);
+    scene = API_URL ? await fetchScene(prompt) : fallbackScene;
   } catch {
-    scene = localScene(prompt);
+    scene = fallbackScene;
   }
 
+  scene = normalizeScene(prompt, scene, fallbackScene);
+
+  if (API_URL && isNarrationVague(scene.narration)) {
+    try {
+      const retryPrompt = {
+        ...prompt,
+        refineNarration: "Previous narration was too vague. Use concrete location, visible threat, and immediate objective.",
+      };
+      const retried = await fetchScene(retryPrompt);
+      const refined = normalizeScene(prompt, retried, fallbackScene);
+      scene = isNarrationVague(refined.narration) ? fallbackScene : refined;
+    } catch {
+      scene = fallbackScene;
+    }
+  }
+
+  state.storyContext = nextStoryContext(state.storyContext, scene, state.theme);
   state.scene = scene;
   state.history.push({ narration: scene.narration, choices: scene.choices, risk: scene.risk, tag: scene.tag, picked: null });
   renderScene();
   save();
   show("scene");
+}
+
+function isNarrationVague(narration = "") {
+  const lower = narration.toLowerCase();
+  const bannedPhrases = [
+    "a strange calm",
+    "fate",
+    "destiny",
+    "something stirs",
+    "danger returns",
+    "an ominous feeling",
+  ];
+  if (narration.length < 90) return true;
+  if (bannedPhrases.some((phrase) => lower.includes(phrase))) return true;
+
+  const concreteSignals = ["bridge", "hall", "gate", "road", "vault", "platform", "alley", "market", "corridor", "ship"];
+  const actionSignals = ["block", "track", "cut", "breach", "hold", "chase", "ambush", "defend", "secure", "extract"];
+
+  return !concreteSignals.some((w) => lower.includes(w)) || !actionSignals.some((w) => lower.includes(w));
+}
+
+function cleanStoryField(value, fallback) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function nextStoryContext(current, scene, theme) {
+  const base = current && typeof current === "object" ? current : initialStoryContext(theme || "unknown");
+  const beat = scene.storyBeat && typeof scene.storyBeat === "object" ? scene.storyBeat : {};
+
+  return {
+    objective: cleanStoryField(beat.objective, base.objective),
+    threat: cleanStoryField(beat.threat, base.threat),
+    location: cleanStoryField(beat.location, base.location),
+    continuity: cleanStoryField(beat.continuity, `Step ${state.step}: ${scene.narration.slice(0, 120)}`),
+  };
+}
+
+function normalizeScene(prompt, scene, fallbackScene) {
+  if (!scene || typeof scene !== "object") return fallbackScene;
+
+  const cleanNarration = typeof scene.narration === "string" ? scene.narration.trim() : "";
+  const cleanChoices = Array.isArray(scene.choices)
+    ? scene.choices
+        .filter((c) => typeof c === "string")
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+
+  if (!cleanNarration || cleanChoices.length < 4) return fallbackScene;
+
+  const validRisks = new Set(["low", "mid", "high"]);
+  const validTags = new Set(["combat", "exploration", "social", "hazard", "boss"]);
+
+  const risk = validRisks.has(scene.risk) ? scene.risk : fallbackScene.risk;
+  const tag = validTags.has(scene.tag) ? scene.tag : fallbackScene.tag;
+
+  const storyBeat = scene.storyBeat && typeof scene.storyBeat === "object"
+    ? {
+        objective: cleanStoryField(scene.storyBeat.objective, prompt.storyContext?.objective || fallbackScene.storyBeat?.objective || "Survive the current chapter"),
+        threat: cleanStoryField(scene.storyBeat.threat, prompt.storyContext?.threat || fallbackScene.storyBeat?.threat || "a lurking enemy"),
+        location: cleanStoryField(scene.storyBeat.location, prompt.storyContext?.location || fallbackScene.storyBeat?.location || "unknown ground"),
+        continuity: cleanStoryField(scene.storyBeat.continuity, prompt.storyContext?.continuity || "Stay on mission"),
+      }
+    : fallbackScene.storyBeat;
+
+  if (prompt.isBossStep) {
+    return { ...scene, narration: cleanNarration, choices: cleanChoices, risk: "high", tag: "boss", storyBeat };
+  }
+
+  return { ...scene, narration: cleanNarration, choices: cleanChoices, risk, tag, storyBeat };
 }
 
 async function fetchScene(prompt) {
@@ -143,6 +248,12 @@ function localScene({ theme, hp, act, step, isBossStep }) {
       ],
       risk: "high",
       tag: "boss",
+      storyBeat: {
+        objective: `Break ${boss} in this clash`,
+        threat: boss,
+        location: `Act ${act} stronghold`,
+        continuity: `Boss chapter in act ${act}`,
+      },
     };
   }
 
@@ -166,7 +277,19 @@ function localScene({ theme, hp, act, step, isBossStep }) {
     hazard: ["Push through quickly", "Stabilise the environment first", "Use gear to bypass danger", "Retreat and wait for a window"],
   };
 
-  return { narration, choices: choiceSets[tag], risk, tag };
+  return {
+    narration,
+    choices: choiceSets[tag],
+    risk,
+    tag,
+    storyBeat: {
+      objective: `Survive act ${act} and secure an advantage`,
+      threat: foe,
+      location: locale,
+      continuity: hook,
+    },
+  };
+
 }
 
 function renderScene() {
@@ -211,41 +334,46 @@ function pickChoice(i) {
   const riskMod = state.scene.risk === "high" ? 0.25 : state.scene.risk === "low" ? -0.15 : 0;
   let roll = base + riskMod;
 
+  // pacing balance across acts
+  if (!isBoss && state.act === 1) roll -= 0.06;
+  if (!isBoss && state.act === 3) roll += 0.05;
+  if (isBoss && state.bossesDefeated >= 1) roll -= 0.06;
+
   // inventory buffs
   if (state.inventory.includes("Lucky Coin")) roll -= 0.08;
   if (state.inventory.includes("Medkit") && state.hp <= 4) {
-    state.hp += 2;
+    state.hp = Math.min(10, state.hp + 2);
     state.inventory = state.inventory.filter((x) => x !== "Medkit");
   }
 
   if (isBoss) {
     roll += 0.15;
-    if (roll > 1.0) state.hp -= 4;
+    if (roll > 0.98) state.hp -= 4;
     else if (roll > 0.7) state.hp -= 2;
     else {
       state.bossesDefeated += 1;
       state.gold += 20;
     }
   } else {
-    if (roll > 1.05) state.hp -= 3;
-    else if (roll > 0.78) state.hp -= 1;
-    else if (roll < 0.12 && state.hp < 10) state.hp += 1;
+    if (roll > 1.0) state.hp -= 3;
+    else if (roll > 0.74) state.hp -= 1;
+    else if (roll < 0.08 && state.hp < 10) state.hp += 1;
     rollLoot();
   }
 
   if (navigator.vibrate) navigator.vibrate(state.hp <= 0 ? [120, 60, 120] : [40]);
 
   if (state.hp <= 0) return endGame(false, `You chose: ${choice}. Fate demanded payment.`);
-  if (state.step >= 12) {
-    const bonus = state.bossesDefeated >= 3 ? "Legendary ending unlocked." : "You survived by grit alone.";
-    return endGame(true, `You endured all three acts in the ${state.theme} realm. ${bonus}`);
+  if (state.step >= TOTAL_STEPS) {
+    const bonus = state.bossesDefeated >= TOTAL_BOSS_STEPS ? "Flawless run bonus unlocked." : "You scraped through by grit.";
+    return endGame(true, `You survived a fast ${TOTAL_STEPS}-scene run in the ${state.theme} realm. ${bonus}`);
   }
   nextScene(choice);
 }
 
 function endGame(win, text) {
   $("endTitle").textContent = win ? "🏆 You Survived" : "☠️ You Died";
-  $("endText").textContent = `${text}  Gold: ${state.gold} • Bosses: ${state.bossesDefeated}/3`;
+  $("endText").textContent = `${text}  Gold: ${state.gold} • Bosses: ${state.bossesDefeated}/${TOTAL_BOSS_STEPS}`;
   localStorage.removeItem("sas_save");
   show("end");
 }
