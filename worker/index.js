@@ -87,69 +87,89 @@ async function handleNarration(body, env) {
   const s = step || 1;
   const h = hp || 10;
 
-  // Build the phase guidance
+  // ── Curate context: only send what this scene needs ──
+  const seed = campaignSeed || {};
+
+  // Pick 1-2 NPCs relevant to this scene, not all of them
+  const allNpcs = npcs || seed.npcs || [];
+  let sceneNpcs = [];
+  if (s <= 2) sceneNpcs = allNpcs.slice(0, 1);       // intro: just the first NPC
+  else if (s <= 6) sceneNpcs = allNpcs.slice(0, 2);   // setup: up to 2
+  else sceneNpcs = allNpcs;                            // later: all available
+  // Only send name + role + current status, NOT secrets/goals/fears
+  const npcBrief = sceneNpcs.map(n => `${n.name} (${n.role || "unknown"}, trust:${n.trust ?? "?"}${n.status === "hostile" ? ", HOSTILE" : ""})`).join(", ");
+
+  // Build lean world context — just enough for this scene
+  const worldBrief = [
+    seed.worldTruth || "",
+    seed.centralConflict ? `Conflict: ${seed.centralConflict}` : "",
+    seed.recurringSymbol ? `Symbol: ${seed.recurringSymbol}` : "",
+    s >= 10 && seed.worldLie ? `World lie (can be challenged now): ${seed.worldLie}` : "",
+    s >= 15 && seed.lateReveal ? `Late reveal (can surface now): ${seed.lateReveal}` : "",
+  ].filter(Boolean).join(". ");
+
+  // Phase guidance — shorter, more directive
   let phase;
-  if (s <= 3) phase = "INTRO: Establish the world, introduce a key NPC, hint at the central conflict. Keep it inviting but ominous.";
-  else if (s <= 5) phase = "SETUP: First real consequence. Something becomes irreversible. An NPC reveals their agenda.";
-  else if (s <= 8) phase = "COMPLICATIONS: Pressure mounts. A recurring NPC returns with changed attitude. Resources grow scarce. The symbol reappears.";
-  else if (s <= 10) phase = "MIDPOINT: A reveal, false victory, or reframing. The central conflict deepens. Reference the worldLie.";
-  else if (s <= 13) phase = "ESCALATION: Betrayal, loss, or collapse. An NPC may turn hostile. Past choices haunt the player.";
-  else if (s <= 16) phase = "IDENTITY: Who is the protagonist becoming? Force moral dilemmas. The forbiddenAct becomes tempting.";
-  else if (s <= 19) phase = "CONVERGENCE: Everything converges. Unresolved threats arrive. Past flags matter. The lateReveal surfaces.";
-  else phase = "FINALE: Step 20. This is the ending. Wrap up based on identity, flags, and NPC relationships. Make it land.";
+  if (s === 1) phase = "OPENING. Set the scene. ONE location, ONE mood. The player arrives. End with something that demands a reaction.";
+  else if (s <= 3) phase = "EARLY. Build the world through one concrete event or encounter. Introduce ONE NPC if needed. Keep it grounded.";
+  else if (s <= 6) phase = "RISING. Something changes because of what the player did. Make it feel earned. Raise the stakes once.";
+  else if (s <= 10) phase = "MIDDLE. Turn the story. A truth shifts. Someone's loyalty changes. Make the player question something.";
+  else if (s <= 15) phase = "LATE. Consequences pile up. Past choices echo. The world feels like it remembers. One thing gets worse.";
+  else if (s <= 19) phase = "CLIMAX. Everything converges. Force a hard decision. No safe options.";
+  else phase = "FINALE. End the story. Reflect who the player became. Make it land in one image.";
 
-  // Scene anchoring: what must this scene resolve and set up?
-  const anchorBlock = previousHook
-    ? `SCENE ANCHOR: The previous scene ended with: "${previousHook}". You MUST open this scene by directly resolving or reacting to that moment. Do NOT ignore it.`
-    : "SCENE ANCHOR: This is the opening scene. Establish the world and end on an intriguing hook.";
+  // Scene anchoring
+  const anchor = previousHook
+    ? `PREVIOUS SCENE ENDED WITH: "${previousHook}"\nYou MUST open by showing what happens next from that exact moment. Do NOT skip ahead or change the subject.`
+    : "This is the opening scene.";
 
-  // Act Director: what should happen this scene
-  const beatDirective = currentBeat
-    ? `PLOT BEAT FOR THIS STEP: "${currentBeat}". Your scene MUST advance this plot point. Do not deviate to unrelated events.`
+  // Beat directive
+  const beat = currentBeat
+    ? `THIS SCENE'S JOB: "${currentBeat}"`
     : "";
 
-  // Story context: compressed summary of everything so far
-  const storyContext = storySoFar
+  // Story so far
+  const recap = storySoFar
     ? `STORY SO FAR: ${storySoFar}`
     : "";
 
   const sys = [
-    "You are the campaign narrator for 'Scroll and Sword', a dark 20-step RPG.",
-    "You have a CAMPAIGN SEED that defines this run's world. OBEY IT.",
+    `You write scenes for a dark ${t} RPG. Step ${s}/20. HP: ${h}/10.`,
     "",
-    anchorBlock,
-    beatDirective,
-    storyContext,
+    anchor,
+    beat,
     "",
-    "STRICT RULES:",
-    "1. CAUSE AND EFFECT: If the player made a choice, show its DIRECT consequence in the FIRST sentence. Never ignore it.",
-    "2. SCENE STRUCTURE: Open by resolving the previous hook → advance the plot beat → end on a NEW hook/cliffhanger that demands resolution next scene.",
-    "3. BREVITY: Max 2 sentences for normal scenes. 3 for reveals/betrayals/endings.",
-    "4. USE THE SEED: Reference recurring NPCs by NAME. Echo the recurring symbol. Honor factions, the worldLie, the forbiddenAct.",
-    "5. REAL CHOICES: 4 options (3-6 words each). Each must be a SPECIFIC action tied to the current scene — not generic. One bold, one cunning, one cautious, one costly.",
-    "6. NO RANDOM EVENTS: Everything connects to the seed, flags, or prior choices. Reuse existing NPCs — do NOT invent new characters.",
-    "7. CONSEQUENCES: Include stateUpdates to track what changed.",
-    "8. CALLBACKS: Every 3-4 scenes, briefly reference an earlier choice, wound, promise, or clue from the storySoFar.",
-    `9. CURRENT PHASE: ${phase}`,
+    `WORLD: ${worldBrief}`,
+    npcBrief ? `NPCs IN PLAY: ${npcBrief}` : "",
+    recap,
     "",
-    "Return ONLY JSON with these keys:",
-    "narration (string — the scene text),",
-    "hook (string — the last sentence/cliffhanger that the NEXT scene must resolve; this is the thread connecting scenes),",
-    "choices (array of 4 strings — specific actions, not generic),",
-    "risk (low|mid|high),",
-    "tag (combat|exploration|social|hazard|boss),",
-    "stateUpdates (object with optional keys: hpDelta (number), flagsAdd (array of strings), resourceChanges (object with key:delta pairs), npcUpdates (array of {name, status, trust_delta}), clueAdd (string or null), threatAdd (string or null), identityShift (object with single key like 'ruthless':1 or 'merciful':1))"
-  ].filter(Boolean).join(" ");
+    `PHASE: ${phase}`,
+    "",
+    "WRITING RULES:",
+    "- Write EXACTLY 2 sentences. Not 1, not 3. Two.",
+    "- Be CONCRETE. Describe what the player SEES, HEARS, or must DO. Not feelings, not atmosphere, not lore dumps.",
+    "- Use ONE named character per scene maximum. If no NPC is relevant, use none.",
+    "- The player's previous choice MUST cause the opening sentence. 'You chose X → Y happened.'",
+    "- End sentence 2 on a SPECIFIC, unresolved moment (someone arriving, a door opening, a sound, a demand). This is the hook.",
+    "",
+    "FORBIDDEN (violating these = failure):",
+    "- NO vague prose: 'a sense of dread', 'the weight of your choices', 'shadows gather', 'an uneasy feeling'",
+    "- NO name-dropping multiple characters. ONE name per scene or zero.",
+    "- NO inventing new characters, locations, or factions not in the seed.",
+    "- NO generic choices like 'press forward', 'look around', 'take a risk', 'continue onward'.",
+    "- NO repeating information the player already knows.",
+    "",
+    "CHOICES: 4 options, 3-6 words each. Each must be a VERB + SPECIFIC OBJECT from this scene. Example: 'Block the doorway', 'Lie about the ledger', 'Follow the blood trail', 'Give her the medallion'.",
+    "",
+    "Return ONLY JSON:",
+    "{\"narration\": \"exactly 2 sentences\", \"hook\": \"the unresolved moment at the end\", \"choices\": [4 specific actions], \"risk\": \"low|mid|high\", \"tag\": \"combat|exploration|social|hazard|boss\", \"stateUpdates\": {hpDelta?, flagsAdd?, resourceChanges?, npcUpdates?, clueAdd?, threatAdd?, identityShift?}}"
+  ].filter(Boolean).join("\n");
 
   const userPayload = {
-    theme: t, hp: h, step: s,
-    previousChoice: previousChoice || null,
-    history: Array.isArray(history) ? history.slice(-6) : [],
-    campaignSeed: campaignSeed || null,
-    currentFlags: flags || [],
-    npcStates: npcs || [],
+    step: s,
+    previousChoice: previousChoice || "game start",
     resources: resources || {},
-    identityProfile: identity || {}
+    flags: (flags || []).slice(-5)
   };
 
   const messages = [
@@ -157,14 +177,14 @@ async function handleNarration(body, env) {
     { role: "user", content: JSON.stringify(userPayload) }
   ];
 
-  const result = await callAI(env, messages, 500);
+  const result = await callAI(env, messages, 350);
 
   if (result && result.narration) {
     // Normalize
     if (!Array.isArray(result.choices) || result.choices.length < 2) {
-      result.choices = ["Press forward", "Hold back", "Look around", "Take a risk"];
+      result.choices = ["Search the room", "Confront them directly", "Slip away quietly", "Destroy the evidence"];
     }
-    while (result.choices.length < 4) result.choices.push("Continue onward");
+    while (result.choices.length < 4) result.choices.push("Wait and watch");
     if (result.choices.length > 4) result.choices = result.choices.slice(0, 4);
     result.risk = ({ low: "low", mid: "mid", medium: "mid", high: "high", danger: "high" })[String(result.risk).toLowerCase()] || "mid";
     if (!["combat", "exploration", "social", "hazard", "boss"].includes(result.tag)) result.tag = "exploration";
@@ -234,7 +254,7 @@ async function callAI(env, messages, maxTokens) {
         headers: { "Authorization": `Bearer ${env.GROQ_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile", messages,
-          temperature: 0.85, max_tokens: maxTokens,
+          temperature: 0.7, max_tokens: maxTokens,
           response_format: { type: "json_object" }
         })
       });
